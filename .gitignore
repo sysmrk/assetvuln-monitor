@@ -12,3 +12,6 @@ __pycache__/
 .pytest_cache/
 *.pyc
 *.log
+
+# Local v0.2 mapping-review output; may contain confidential software inventory.
+mapping-review*.json
