@@ -19,7 +19,7 @@ For actual Live usage, `config/product-mappings.live.yaml` starts empty. Therefo
 
 ## Run an offline example
 
-From a checkout of `develop/v0.2`, install the Python requirements in a local environment if needed (`PyYAML` is required), then run:
+From a checkout of `develop/v0.3`, install the Python requirements in a local environment if needed (`PyYAML` is required), then run:
 
 ```bash
 python3 scripts/suggest_mappings.py \
@@ -59,7 +59,7 @@ Check the software identity and exact vendor/product against an authoritative so
 
 ## Limitations and follow-up
 
-- The report operates on a CSV snapshot; the v0.2 runtime worker only adopts **approved exact normalized keys**, not fuzzy suggestions.
+- The report operates on a CSV snapshot; the V3 runtime worker only adopts **approved exact normalized keys**, not fuzzy suggestions.
 - A database-backed application-level review audit and privileged CLI are included in V2/V3; **no authenticated reviewer UI, immutable audit storage, vendor synonym catalogue or PURL/CPE resolution yet**.
 - Similar names (e.g. different major product editions) can score highly but still be unrelated.
 - Coverage metrics refer to exact approved identities **within the supplied catalogue**, not to full CVE intelligence coverage.
@@ -69,7 +69,7 @@ Check the software identity and exact vendor/product against an authoritative so
 
 ```bash
 python3 -m pytest -q tests/test_normalization.py tests/test_compose_isolation.py tests/test_api_smoke.py
-python3 scripts/check_compose_isolation.py --baseline-dir /path/to/v0.1 --candidate-dir /path/to/v0.2
+python3 scripts/check_compose_isolation.py --baseline-dir /path/to/v0.1 --candidate-dir /path/to/v0.3
 ```
 
 The isolation checker compares resolved Docker Compose configurations, never starts containers, and returns nonzero on resource/port overlap.
