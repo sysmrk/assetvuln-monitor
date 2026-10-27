@@ -1,4 +1,4 @@
-name: assetvuln-monitor
+name: ${COMPOSE_PROJECT_NAME:-assetvuln-monitor-v02}
 
 services:
   postgres:
