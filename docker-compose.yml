@@ -1,4 +1,4 @@
-name: ${COMPOSE_PROJECT_NAME:-assetvuln-monitor-v02}
+name: ${COMPOSE_PROJECT_NAME:-assetvuln-monitor-v03}
 
 services:
   postgres:
@@ -35,9 +35,11 @@ services:
     command: ["python", "-m", "avm.worker"]
     environment:
       AVM_CONFIG: /opt/avm/config/application.yaml
+      AVM_ASSET_CONTEXT: /opt/avm/config/asset-context.yaml
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set this variable in .env}
     volumes:
       - ./config/application.yaml:/opt/avm/config/application.yaml:ro
+      - ./config/asset-context.yaml:/opt/avm/config/asset-context.yaml:ro
       - ${PRODUCT_MAPPINGS_FILE:-./config/product-mappings.yaml}:/opt/avm/config/product-mappings.yaml:ro
       - ./secrets/manageengine_token:/run/secrets/manageengine_token:ro
       - ./secrets/certs:/opt/avm/certs:ro
@@ -64,7 +66,7 @@ services:
       MB_DB_DBNAME: metabase
       MB_DB_USER: mb_user
       MB_DB_PASS: ${MB_DB_PASSWORD:?Set this variable in .env}
-      MB_SITE_URL: ${PUBLIC_URL:-https://localhost:8444}
+      MB_SITE_URL: ${PUBLIC_URL:-https://localhost:8445}
       MB_LOAD_SAMPLE_CONTENT: 'false'
       MB_ANON_TRACKING_ENABLED: 'false'
       MB_CHECK_FOR_UPDATES: 'false'
@@ -83,7 +85,7 @@ services:
     image: nginx:1.28-alpine
     restart: unless-stopped
     ports:
-      - "${BIND_IP:-127.0.0.1}:${HTTPS_PORT:-8444}:443"
+      - "${BIND_IP:-127.0.0.1}:${HTTPS_PORT:-8445}:443"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./secrets/tls/tls.crt:/etc/nginx/tls/tls.crt:ro
