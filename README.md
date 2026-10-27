@@ -17,7 +17,7 @@ python3 scripts/suggest_mappings.py --inventory-csv examples/software-inventory.
 python3 -m pytest -q
 ```
 
-See [software normalization and mapping review](docs/SOFTWARE-NORMALIZATION.md) and [v0.2 roadmap](docs/ROADMAP-v0.2.md). To validate Compose isolation against a v0.1 checkout, run `python3 scripts/check_compose_isolation.py --baseline-dir /path/to/v0.1` before starting both deployments. GitHub Actions runs unit tests and Compose syntax checks on the development branch.
+See [software normalization and mapping review](docs/SOFTWARE-NORMALIZATION.md) and [v0.2 roadmap](docs/ROADMAP-v0.2.md). To validate Compose isolation against a v0.1 checkout, run `python3 scripts/check_compose_isolation.py --baseline-dir /path/to/v0.1` before starting both deployments. GitHub Actions runs unit tests, Compose syntax/collision checks, and a throwaway PostgreSQL integration test on the development branch. Check the actual workflow result before relying on them.
 
 ## v0.2 — Audited mapping review and seventh dashboard
 
