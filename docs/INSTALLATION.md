@@ -15,7 +15,7 @@
 | Metabase dashboards | Automatically provisioned | Automatically provisioned |
 | Production approved | No; testing only | **Not yet; validate before production use** |
 
-**Do not switch an existing demo database to live mode.** Synthetic demo records persist in the database. Use a separate fresh deployment/database for real inventory.
+**Do not switch an existing demo database to live mode.** Synthetic demo records persist in the database. Use a separate fresh deployment/database for real inventory. **Warning:** this Compose file fixes the project name to `assetvuln-monitor`, so a separate checkout directory on the *same Docker daemon* does NOT isolate the named volume.
 
 ## 1. Prerequisites — Ubuntu 24.04 / WSL2
 
@@ -88,7 +88,7 @@ docker compose start                  # restart, keep persistent data
 
 ## 3. LIVE — real Endpoint Central integration (separate fresh installation)
 
-Use a separate host or deployment directory **without demo volumes**. Example for a dedicated host:
+Use a **separate Docker host/daemon** for the initial live deployment, or first implement and verify distinct Compose project/volume names. A separate directory on the same daemon is **not** sufficient with the current fixed Compose project name. Example on a fresh dedicated host:
 
 ```bash
 sudo mkdir -p /opt/assetvuln-live
