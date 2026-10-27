@@ -93,4 +93,58 @@ DASHBOARDS = {
          'SELECT source, last_success_at, last_failed_at, successful_runs, failed_runs '
          'FROM reporting.data_quality_sync_freshness ORDER BY source', 24),
     ],
+    '08 · Risk Intelligence & Remediation': [
+        ('Active Potential Findings', 'scalar',
+         'SELECT active_findings FROM reporting.risk_overview', 6),
+        ('P1 Highest Priority', 'scalar',
+         'SELECT p1_findings FROM reporting.risk_overview', 6),
+        ('CISA KEV Findings', 'scalar',
+         'SELECT kev_findings FROM reporting.risk_overview', 6),
+        ('SLA Overdue', 'scalar',
+         'SELECT overdue_findings FROM reporting.risk_overview', 6),
+        ('Total Modeled Priority Points', 'scalar',
+         'SELECT priority_points FROM reporting.risk_overview', 6),
+        ('Accepted Risks · Unexpired', 'scalar',
+         'SELECT accepted_findings FROM reporting.risk_overview', 6),
+        ('Unscored Potential Findings', 'scalar',
+         'SELECT unscored_findings FROM reporting.risk_overview', 6),
+        ('Assets Without Explicit Criticality', 'scalar',
+         'SELECT unknown_criticality FROM reporting.asset_context_quality', 6),
+        ('Priority Tiers', 'pie',
+         'SELECT priority, count(*) AS findings FROM reporting.risk_queue '
+         'GROUP BY priority ORDER BY priority', 12),
+        ('Priority by Business Service', 'bar',
+         'SELECT business_service, modeled_priority_points FROM reporting.risk_by_service '
+         'ORDER BY modeled_priority_points DESC LIMIT 15', 12),
+        ('Modeled Priority Points by Owner', 'bar',
+         'SELECT owner, modeled_priority_points FROM reporting.risk_by_owner '
+         'ORDER BY modeled_priority_points DESC LIMIT 15', 12),
+        ('Daily Priority Trend', 'line',
+         'SELECT day, priority_points FROM reporting.risk_trend '
+         'ORDER BY day ASC LIMIT 365', 12),
+        ('Risk-Based Remediation Queue', 'table',
+         'SELECT finding_id, priority, risk_score, hostname, cve_id, '
+         'software, version, cvss, epss, epss_asof, kev, criticality, internet_facing, '
+         'business_service, owner, workflow_state, sla_due_at, overdue '
+         'FROM reporting.risk_queue ORDER BY risk_score DESC NULLS LAST LIMIT 2000', 24),
+        ('CISA KEV Exposure Queue', 'table',
+         'SELECT finding_id, hostname, cve_id, software, risk_score, '
+         'business_service, owner, sla_due_at, overdue FROM reporting.risk_queue '
+         'WHERE kev ORDER BY risk_score DESC NULLS LAST LIMIT 1000', 24),
+        ('Finding Evidence & Candidate Remediation', 'table',
+         'SELECT finding_id, cve_id, hostname, software, version, priority, '
+         'evidence_packet, remediation FROM reporting.finding_evidence '
+         'ORDER BY risk_score DESC NULLS LAST LIMIT 1000', 24),
+        ('Risk Acceptance & Lifecycle', 'table',
+         'SELECT finding_id, cve_id, hostname, workflow_state, '
+         'accepted_by, accepted_until, first_detected, last_detected, '
+         'sla_due_at FROM reporting.finding_lifecycle '
+         'ORDER BY last_detected DESC LIMIT 1000', 24),
+        ('Finding Decision & State Audit', 'table',
+         'SELECT event_id, finding_id, action, actor, reason, created_at '
+         'FROM reporting.finding_event_history ORDER BY event_id DESC LIMIT 500', 24),
+        ('Missing Asset Context', 'table',
+         'SELECT active_assets, unknown_criticality, unknown_exposure, unassigned_owner '
+         'FROM reporting.asset_context_quality', 24),
+    ],
 }
