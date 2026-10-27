@@ -31,3 +31,7 @@
 - `avm_reader` receives SELECT on approved `reporting.*` views only, including review queue/audit, and has **no write permission** on mapping tables. Restrict report access because software inventories and reviewer identifiers are sensitive.
 - Manual proposals enforce a distinct proposer/reviewer **identifier**, not real cryptographic authentication. Someone with Worker shell or application database credentials could impersonate identities or modify application-level audit records. SSO/RBAC, WORM logging and external audit forwarding are still required for enterprise readiness.
 - Any update to a reviewed identity or approved mapping should go through future controlled revocation/change-management features, never ad hoc database edits.
+
+## Continuous validation boundaries (v0.2)
+
+The development branch includes a GitHub Actions job using an ephemeral PostgreSQL 17 service with **synthetic test credentials**. It exercises new review schema, read-only views, and actual `avm_reader` privileges. These are not production credentials. This does not validate real Endpoint Central calls, SSO actor identity, image digests, PostgreSQL concurrency under load, or Metabase administrative controls. Check GitHub Actions results and complete runtime tests before production use.
