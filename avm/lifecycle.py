@@ -23,8 +23,16 @@ def _event(session, finding, action, reason):
                              actor='system:worker', reason=reason))
 
 
-def recalculate_findings(session, *, allow_disappearance=False):
+def recalculate_findings(session, *, allow_disappearance=False, sla_days=None):
     """Rebuild potential matches; closure only with an explicitly complete scan."""
+    deadlines = dict(SLA_DAYS)
+    if sla_days is not None:
+        if not isinstance(sla_days, dict) or set(sla_days) != set(SLA_DAYS):
+            raise ValueError('risk.sla_days requires exactly P1, P2, P3, P4')
+        for level, days in sla_days.items():
+            if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 3650:
+                raise ValueError('Each SLA duration must be 1..3650 days')
+        deadlines.update(sla_days)
     stamp = now()
     packages = defaultdict(list)
     for affected in session.scalars(select(AffectedPackage)):
@@ -93,7 +101,7 @@ def recalculate_findings(session, *, allow_disappearance=False):
             record.risk_score = result['score']
             record.priority = result['priority']
             record.risk_factors = result
-            record.sla_due_at = record.first_detected + timedelta(days=SLA_DAYS[record.priority])
+            record.sla_due_at = record.first_detected + timedelta(days=deadlines[record.priority])
             if record.workflow_state in (None, ''):
                 record.workflow_state = 'open'
             if record.state_updated_at is None:
@@ -121,7 +129,7 @@ def recalculate_findings(session, *, allow_disappearance=False):
                 finding.risk_score = score['score']
                 finding.priority = score['priority']
                 finding.risk_factors = score
-                finding.sla_due_at = finding.first_detected + timedelta(days=SLA_DAYS[score['priority']])
+                finding.sla_due_at = finding.first_detected + timedelta(days=deadlines[score['priority']])
                 if finding.workflow_state == 'accepted' and (
                         finding.accepted_until is None or finding.accepted_until <= stamp):
                     _event(session, finding, 'acceptance_expired', 'Risk acceptance expired')
