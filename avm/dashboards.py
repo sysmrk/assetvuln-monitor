@@ -37,7 +37,11 @@ DASHBOARDS = {
         ('Detection Trend', 'line', 'SELECT detected_day, findings_created FROM reporting.detection_timeline ORDER BY detected_day DESC LIMIT 180', 12),
         ('Most Exposed Systems', 'bar', 'SELECT hostname, critical_findings, matched_findings FROM reporting.top_risky_assets ORDER BY critical_findings DESC LIMIT 15', 12),
     ],
-    '07 · Mapping Quality & Review': [
+    '06 · Pipeline Health & Coverage': [
+        ('Mapped Packages', 'scalar', 'SELECT mapped_products FROM reporting.coverage', 6),
+        ('Unmapped Packages', 'scalar', 'SELECT unmapped_products FROM reporting.coverage', 6),
+        ('Recent Collection Runs', 'table', 'SELECT source, started_at, finished_at, success, record_count, message FROM reporting.ingestion_health ORDER BY started_at DESC LIMIT 100', 24),
+    ],    '07 · Mapping Quality & Review': [
         ('Active Software Products', 'scalar',
          'SELECT active_products FROM reporting.data_quality_overview', 6),
         ('Verified Mapping Coverage %', 'scalar',
@@ -88,10 +92,5 @@ DASHBOARDS = {
         ('Source Sync Freshness', 'table',
          'SELECT source, last_success_at, last_failed_at, successful_runs, failed_runs '
          'FROM reporting.data_quality_sync_freshness ORDER BY source', 24),
-    ],
-    '06 · Pipeline Health & Coverage': [
-        ('Mapped Packages', 'scalar', 'SELECT mapped_products FROM reporting.coverage', 6),
-        ('Unmapped Packages', 'scalar', 'SELECT unmapped_products FROM reporting.coverage', 6),
-        ('Recent Collection Runs', 'table', 'SELECT source, started_at, finished_at, success, record_count, message FROM reporting.ingestion_health ORDER BY started_at DESC LIMIT 100', 24),
     ],
 }
