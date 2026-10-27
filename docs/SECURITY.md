@@ -23,3 +23,11 @@
 - Metabase's internal users can modify saved charts when their Metabase role allows it, but they cannot modify Endpoint Central assets through this project.
 - Change and audit handling for real vulnerability confirmations require additional workflow support; version matches should be reviewed by security staff.
 - Build and upgrade require image supply-chain verification. Test all operational changes in staging, including vendor API compatibility.
+
+## Mapping review trust boundary (v0.2)
+
+- The new reviewer CLI runs only inside the privileged Worker execution context and writes local application PostgreSQL review records; it never sends mutation requests to Endpoint Central.
+- Suggestions are **not trusted mappings**. Approval inserts a separate unique approved identity, used at the next inventory sync. Rejected candidates cannot be automatically reopened.
+- `avm_reader` receives SELECT on approved `reporting.*` views only, including review queue/audit, and has **no write permission** on mapping tables. Restrict report access because software inventories and reviewer identifiers are sensitive.
+- Manual proposals enforce a distinct proposer/reviewer **identifier**, not real cryptographic authentication. Someone with Worker shell or application database credentials could impersonate identities or modify application-level audit records. SSO/RBAC, WORM logging and external audit forwarding are still required for enterprise readiness.
+- Any update to a reviewed identity or approved mapping should go through future controlled revocation/change-management features, never ad hoc database edits.
