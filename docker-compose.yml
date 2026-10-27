@@ -38,7 +38,7 @@ services:
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set this variable in .env}
     volumes:
       - ./config/application.yaml:/opt/avm/config/application.yaml:ro
-      - ./config/product-mappings.yaml:/opt/avm/config/product-mappings.yaml:ro
+      - ${PRODUCT_MAPPINGS_FILE:-./config/product-mappings.yaml}:/opt/avm/config/product-mappings.yaml:ro
       - ./secrets/manageengine_token:/run/secrets/manageengine_token:ro
       - ./secrets/certs:/opt/avm/certs:ro
     depends_on:
