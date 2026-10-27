@@ -1,4 +1,4 @@
-# AssetVuln Monitor
+# AssetVuln Monitor — v0.2 development branch
 
 **Read-only asset and vulnerability-intelligence dashboards, packaged entirely in Docker Compose.**
 
@@ -6,7 +6,7 @@ Endpoint Central ➜ PostgreSQL ➜ conservative CVE correlation ➜ automatical
 
 > **Status: v0.1 technical preview.** Demo fixtures and unit tests have been exercised, but a real Endpoint Central instance and Docker runtime were **not available** in the build environment. Production integrations must be validated against your actual build and the current cve.now response format before operational use.
 
-## Quick start: choose DEMO or LIVE
+**v0.2 isolation:** use `COMPOSE_PROJECT_NAME=assetvuln-monitor-v02`, `HTTPS_PORT=8444`, and `PUBLIC_URL=https://localhost:8444` in this branch's `.env`. Never reuse v0.1 database volumes. See [v0.2 isolation guide](docs/V02-ISOLATION.md).\n\n## Quick start: choose DEMO or LIVE
 
 > **Important:** v0.1 is a technical preview. The demo can be evaluated locally; the live Endpoint Central/cve.now integration has not yet been validated against real vendor responses and is **not production-certified**. The application is read-only toward managed assets in both modes.
 
