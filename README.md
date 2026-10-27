@@ -6,36 +6,78 @@ Endpoint Central ➜ PostgreSQL ➜ conservative CVE correlation ➜ automatical
 
 > **Status: v0.1 technical preview.** Demo fixtures and unit tests have been exercised, but a real Endpoint Central instance and Docker runtime were **not available** in the build environment. Production integrations must be validated against your actual build and the current cve.now response format before operational use.
 
-## WSL / Windows quick start (no ManageEngine required)
+## Quick start: choose DEMO or LIVE
 
-Prerequisites: WSL2 Ubuntu, Docker Desktop with WSL integration (or Docker Engine with Compose v2), OpenSSL and Git. Allow approximately 4 GB of memory for the stack.
+> **Important:** v0.1 is a technical preview. The demo can be evaluated locally; the live Endpoint Central/cve.now integration has not yet been validated against real vendor responses and is **not production-certified**. The application is read-only toward managed assets in both modes.
+
+### DEMO — WSL2 / Ubuntu 24.04 (no ManageEngine)
+
+Docker Engine must be running. The project requires **Compose v2** (`docker compose`), not legacy `docker-compose` v1.
 
 ```bash
-# Clone or download this repository, then:
+# On Ubuntu 24.04, if Docker is already running but Compose v2 is missing:
+sudo apt update
+sudo apt install -y docker-compose-v2 git openssl
+docker compose version
+docker info --format '{{.ServerVersion}}'
+
+# Download and run:
+cd /opt/src
+git clone https://github.com/sysmrk/assetvuln-monitor.git
 cd assetvuln-monitor
 ./install.sh --demo
+
+# Check status and inspect logs:
+docker compose ps
+docker compose logs --tail=100 worker
+docker compose logs --tail=100 metabase
+grep '^METABASE_ADMIN_EMAIL=' .env
+grep '^METABASE_ADMIN_PASSWORD=' .env
 ```
 
-Open **https://localhost:8443** in your browser. The automatically generated certificate is self-signed; the browser will warn you in local demo mode. Log in with **admin@example.local** and the `METABASE_ADMIN_PASSWORD` in `.env`.
+Open **https://localhost:8443**. The localhost TLS certificate is self-signed for demo use. The installer generates the Metabase password in `.env` and provisions six dashboards automatically. Demo records are synthetic, clearly labeled `CVE-DEMO-*`, and never fetched from ManageEngine.
 
-Your six dashboards and their saved questions are created **automatically**. No manual DB or Metabase setup is required. All demo CVEs are named `CVE-DEMO-*` and marked synthetic; they are **not real vulnerabilities**.
+### LIVE — real inventory (separate clean deployment)
+
+**Never reuse a demo database for live assets:** demo data is not automatically removed. Use a fresh installation/volume.
 
 ```bash
-docker compose ps                   # health/status
-docker compose logs -f worker       # data collection and matching
-docker compose logs -f metabase     # dashboard troubleshooting
-./scripts/backup.sh                 # database + dashboard backup
+cd /opt
+git clone https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-live
+cd assetvuln-monitor-live
+cp config/application.example.yaml config/application.yaml
+nano config/application.yaml
+mkdir -p secrets/certs secrets/tls
+nano secrets/manageengine_token
+chmod 600 secrets/manageengine_token config/application.yaml
+nano config/product-mappings.yaml
+./install.sh --live
+docker compose ps
+docker compose logs --tail=200 worker
 ```
 
-## Switch to real Endpoint Central
+**Edit these exact fields in `config/application.yaml`:**
 
-1. Edit `config/application.yaml`: set `application.mode: live`, and update `manageengine.url` with your **HTTPS** On-Premises URL (often port 8383).
-2. Put an **Inventory.READ** token in `secrets/manageengine_token`, never in YAML or Git.
-3. Use a trusted CA. For an internal CA, copy a PEM certificate to `secrets/certs/` and set `manageengine.ca_bundle: /opt/avm/certs/<filename>.pem`.
-4. Review `config/product-mappings.yaml` to add **verified** package ecosystem identities. Ordinary desktop-software names often have no unambiguous OSV package identity.
-5. Run `./install.sh --live` and inspect worker logs and the Pipeline Health dashboard.
+| Field | Real value / example |
+|---|---|
+| `application.mode` | `live` |
+| `application.timezone` | Your timezone, e.g. `Asia/Tehran` |
+| `manageengine.url` | `"https://endpoint.example.org:8383"` (HTTPS base URL) |
+| `manageengine.token_file` | Keep `/run/secrets/manageengine_token` |
+| `manageengine.verify_tls` | Keep `true` |
+| `manageengine.ca_bundle` | `""` or `"/opt/avm/certs/org-ca.pem"` |
+| `manageengine.sync_minutes` | `360` (6 hours) |
+| `manageengine.max_assets` / `max_pages` | Set safe inventory and pagination caps |
+| `cve.url` | `"https://cve.now"` |
+| `cve.sync_minutes` / `max_pages_per_poll` | `30` / `5` |
+| `matching.mappings_file` | Keep `/opt/avm/config/product-mappings.yaml` |
+| `notifications.email_enabled` | `false` unless SMTP is configured |
 
-**No write capabilities are implemented for Endpoint Central or endpoints.** The collector only issues GET requests; do not give it Admin credentials. The worker writes only to **its own local PostgreSQL database**, and bootstrap writes only **its own Metabase configuration**.
+Put **only the least-privilege, read-only inventory API token** in `secrets/manageengine_token` — not in YAML or Git. If using an internal CA, copy its PEM into `secrets/certs/org-ca.pem` and set the container CA path above. Use `config/product-mappings.yaml` only for verified software identities.
+
+The installer generates a private `.env` containing `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD`, database passwords, `BIND_IP`, `HTTPS_PORT`, and `PUBLIC_URL`. Review these before exposing a live installation; replace demo TLS certificates with trusted ones. **Never commit `.env`, tokens or private keys.**
+
+For **every command**, all optional fields, HTTPS configuration, backup/restore, and troubleshooting, read the [complete step-by-step installation guide](docs/INSTALLATION.md) and [configuration reference](docs/CONFIGURATION.md).
 
 ## Prebuilt dashboard catalog
 
