@@ -5,7 +5,7 @@
 ## Trust boundaries
 
 - ManageEngine token exists as a private host file and is mounted read-only into the worker, not Metabase/NGINX/PostgreSQL.
-- Only NGINX publishes an HTTPS port, bound to `127.0.0.1` by default.
+- Only NGINX publishes an HTTPS port, bound to `127.0.0.1` by default. NGINX is attached to the non-internal `ingress` bridge for Docker port publishing and to the internal `frontend` network for Metabase proxying; Metabase is not attached to `ingress`.
 - PostgreSQL is internal-only; no host port binding.
 - The Metabase connection to the application database uses `avm_reader` with SELECT on reporting views only.
 - Dashboard content is hidden behind Metabase login; no anonymous/public links are provisioned.
@@ -15,6 +15,7 @@
 
 ## Residual risks and hardening TODOs
 
+- Copy `example.env` to `.env` before installation, replace all placeholder credentials, and never commit the populated file. The installer does not overwrite existing `.env` values.
 - Docker Compose `.env` passwords are visible to local Docker administrators. Docker administration is privileged; restrict host access.
 - The Metabase image's own system permissions and JVM memory are controlled by upstream. Verify the pinned image digest, dependencies, and CVEs before production rollout.
 - HTTPS from NGINX terminates at the proxy; private Docker-network service traffic is HTTP by default. Do not place untrusted containers on these networks.
