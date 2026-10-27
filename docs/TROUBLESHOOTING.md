@@ -2,6 +2,9 @@
 
 | Symptom | Action |
 |---|---|
+| `.env` missing or `CHANGE_ME_*` password | Run `cp example.env .env`, edit all required credentials, then rerun installer; it will not overwrite your settings |
+| HTTPS port not published when frontend is internal | NGINX must also attach to the non-internal `ingress` bridge; keep the Metabase-only `frontend` internal. Verify with `docker port assetvuln-monitor-nginx-1` |
+| Docker image build cannot reach PyPI | Set a trusted `PIP_INDEX_URL` in `.env` and rerun; avoid untrusted package mirrors for production |
 | Docker not found | Install Docker Desktop, enable WSL integration, restart your Ubuntu WSL shell |
 | `docker compose` unavailable | Upgrade to Docker Compose v2 |
 | Browser shows certificate warning | Expected for WSL self-signed TLS; install a trusted cert in production |
