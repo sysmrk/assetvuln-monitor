@@ -55,6 +55,9 @@ mkdir -p secrets/tls secrets/certs
 if [[ ! -f config/application.yaml ]]; then
   cp config/application.example.yaml config/application.yaml
 fi
+if [[ ! -f config/asset-context.yaml ]]; then
+  cp config/asset-context.example.yaml config/asset-context.yaml
+fi
 if [[ "$mode" == demo ]]; then
   sed -i 's/^  mode: live *# demo | live/  mode: demo                       # demo | live/' config/application.yaml
 else
