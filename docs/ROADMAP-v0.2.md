@@ -21,26 +21,26 @@ v0.2 focuses on **reliable inventory and defensible software-to-vulnerability id
 - [ ] Validate actual Endpoint Central API response fields and pagination across versions.
 - [ ] Record API status, pages read, item counts, schema failures, and collection timestamps without leaking credentials.
 - [ ] Avoid marking unseen assets inactive after partial/incomplete collection.
-- [ ] Build full runtime data-quality metrics; the offline CLI now counts unique, approved and unmapped products, plus review candidates.
+- [x] Add runtime reporting views for active distinct software products, unknown vendors/versions, mapping coverage and review state. **Performance and accuracy at enterprise scale not yet validated**.
 
 **Exit criteria:** ingestion is measurable and fails closed on partial/invalid data.
 
 ## Milestone 2 — Software normalization and controlled mapping
 
 - [x] Implement conservative Unicode/whitespace identity normalization and preserve raw inputs; integrate approved-only exact normalized keys into the v0.2 worker.
-- [x] Model review-only candidate package identities from existing approved catalogue in an offline report; **no persisted review store or PURL/CPE engine yet**.
+- [x] Persist review-only proposals in PostgreSQL with explicit status and evidence; **PURL/CPE and authenticated review UI remain open**.
 - [x] Add explainable string similarity and source/evidence labels; explicitly **not** a probability/confidence of product identity and never auto-promote.
-- [ ] Provide analyst approval/rejection and audit trail; begin with CLI or a simple review interface.
+- [x] Implement privileged CLI for propose/approve/reject/history, separate manual proposer/reviewer identifiers, and application-level audit events. **SSO/RBAC and immutable audit store remain open**.
 - [x] Keep demo and live mapping sources separate; offline sample catalog is synthetic and separate from both.
 
 **Exit criteria:** reviewers can explain and reproduce every approved mapping.
 
 ## Milestone 3 — Mapping coverage dashboard
 
-- [ ] Distinguish discovered software, verified mapped software, and software with supported advisory coverage.
-- [ ] Display coverage by vendor, OS, business segment and last successful sync.
-- [ ] Show candidates awaiting review, unmapped inventory and trends.
-- [ ] Define explicit denominators to avoid misleading coverage percentages.
+- [x] Distinguish active software, approved mapping identity and existence of **ingested** advisory records (limited feed; not comprehensive CVE coverage).
+- [x] Display coverage by vendor, OS, domain and latest ingestion success/failure timestamp; **business criticality attributes not available yet**.
+- [x] Show pending reviews, audit history and unmapped active products. **Historical trend snapshots remain open**.
+- [x] Define active distinct-product denominators and explicitly separate mapping coverage from ingested advisory presence.
 
 **Exit criteria:** dashboards make gaps and uncertainty visible, not just positive matches.
 
@@ -61,6 +61,9 @@ Asset criticality, EPSS/KEV enrichment, risk prioritization, vulnerability lifec
 - Offline normalization/suggestion core: `avm/normalization.py`, `scripts/suggest_mappings.py`, synthetic examples and test coverage.
 - GitHub Actions quality workflow: `.github/workflows/v02-quality.yml` (CI execution results not yet independently verified).
 - Installation and configuration documentation updated for the `develop/v0.2` checkout.
+- `avm/mapping_review.py` persists pending proposals, independent reviewer decisions and approved-only identities; `avm/review_cli.py` manages them with a privileged CLI.
+- `avm/models.py` provides 3 review tables and 8 new `reporting.*` views; `avm/dashboards.py` provisions the seventh dashboard.
+- SQLite unit tests exercise approval and decision history; PostgreSQL/Metabase end-to-end validation is still pending.
 
 ## Current constraints
 
