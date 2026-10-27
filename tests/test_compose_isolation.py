@@ -17,7 +17,7 @@ def sample(name, port, root):
 
 def test_isolated_default_names_and_ports():
     assert isolation_errors(sample('assetvuln-monitor', 8443, '/opt/v01'),
-                            sample('assetvuln-monitor-v02', 8444, '/opt/v02')) == []
+                            sample('assetvuln-monitor-v03', 8445, '/opt/v03')) == []
 
 
 def test_fails_when_same_project():
@@ -45,7 +45,7 @@ def test_cli_json_offline(tmp_path):
     old = tmp_path / 'old.json'
     new = tmp_path / 'new.json'
     old.write_text(json.dumps(sample('assetvuln-monitor', 8443, '/opt/v01')))
-    new.write_text(json.dumps(sample('assetvuln-monitor-v02', 8444, '/opt/v02')))
+    new.write_text(json.dumps(sample('assetvuln-monitor-v03', 8445, '/opt/v03')))
     assert main(['--baseline-json', str(old), '--candidate-json', str(new)]) == 0
     new.write_text(json.dumps(sample('assetvuln-monitor', 8443, '/opt/v01')))
     assert main(['--baseline-json', str(old), '--candidate-json', str(new)]) == 1
