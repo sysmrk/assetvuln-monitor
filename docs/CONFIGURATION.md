@@ -43,3 +43,7 @@ Do not map unrelated products based on name similarity. A missing mapping does n
 ## Independent ManageEngine API test
 
 Before `./install.sh --live`, run `python3 scripts/test_manageengine_api.py` after configuring the HTTPS URL and read-only token. It lists both GET endpoints and checks their initial JSON responses, with PASS/FAIL/SKIP results. Options include `--resource-id 12345` and `--ca-bundle secrets/certs/org-ca.pem`. No Docker or database required; no secrets printed. This is a smoke test, not exhaustive API compatibility validation.
+
+## v0.2 mapping review and normalization
+
+In the `develop/v0.2` branch, the runtime worker matches only **operator-approved** YAML identities, now comparing software vendor/name with Unicode NFKC, case folding and collapsed whitespace. Duplicate approved identities are rejected instead of silently overwritten. The offline `scripts/suggest_mappings.py` produces candidate suggestions and coverage metrics from a CSV export, but **never modifies the YAML, database or findings**. All similar-name suggestions require manual verification. See [normalization guide](SOFTWARE-NORMALIZATION.md).
