@@ -1,0 +1,3 @@
+# LIVE ONLY: add verified vendor/name to ecosystem/package identities.
+# Empty by default to prevent unverified CVE correlations.
+products: []
