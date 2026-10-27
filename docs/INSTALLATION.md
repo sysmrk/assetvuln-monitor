@@ -140,15 +140,39 @@ Paste **only** the read-only Endpoint Central API token into `secrets/manageengi
 
 If Endpoint Central uses an internal certificate authority, copy the trusted CA PEM into `secrets/certs/org-ca.pem` and set `manageengine.ca_bundle` as shown above. Never set `verify_tls: false` to bypass certificate verification.
 
-If you need additional **verified** package mappings:
+### Why product mappings differ between Demo and Live
 
-```bash
-nano config/product-mappings.yaml
+`config/product-mappings.yaml` contains **two fake demo identities**, corresponding to the synthetic inventory and synthetic CVEs. They are not verified mappings for your organization. For Live, use the separate `config/product-mappings.live.yaml` (initially `products: []`) and set `PRODUCT_MAPPINGS_FILE=./config/product-mappings.live.yaml` in `.env`. The empty default means software is inventoried but no unverified CVE matches are generated.
+
+For real findings, edit the live mapping file and add `vendor` and `name` **exactly as reported by Endpoint Central**, plus `ecosystem` and `package` **verified against the advisory**. Case is ignored for vendor/name, but fuzzy similarity is not used. Example of YAML **structure only** (not a valid preapproved mapping):
+
+```yaml
+products:
+  - vendor: "Verified Vendor From Inventory"
+    name: "Verified Product From Inventory"
+    ecosystem: "PyPI"
+    package: "verified-package-from-advisory"
 ```
 
-Only map software to known ecosystem/package identifiers. A matching name alone is not sufficient evidence of vulnerability.
+Do not assume that desktop software shares the identity or affected versions of a similarly named npm/PyPI package. See [configuration reference](CONFIGURATION.md#software-identity-mappings).
 
-Start live mode:
+### ManageEngine API preflight — run before Live install
+
+After setting `manageengine.url` in `config/application.yaml` and adding the read-only token to `secrets/manageengine_token`, run:
+
+```bash
+python3 scripts/test_manageengine_api.py
+# If needed, specify a known computer:
+python3 scripts/test_manageengine_api.py --resource-id 12345
+# For internal CA certificates:
+python3 scripts/test_manageengine_api.py --ca-bundle secrets/certs/org-ca.pem
+```
+
+The test **prints the two GET API paths** before running, then reports PASS/FAIL/SKIP, response time and first-page record counts. It runs without Docker or database, does not modify assets and never prints the token or full JSON. A PASS is a limited smoke test; it does not prove pagination and all field schemas are compatible. Investigate FAIL/SKIP before starting Live.
+
+
+
+Start live mode **after the independent API test**:
 
 ```bash
 ./install.sh --live
@@ -182,7 +206,7 @@ Create `.env` yourself with `cp example.env .env`, replace **all** `CHANGE_ME_*`
 
 In `config/application.yaml`, set `notifications.email_enabled: true`, then set `notifications.smtp_host`, `smtp_port`, `smtp_starttls`, `sender`, and `recipients`. Authentication uses `SMTP_USER` and `SMTP_PASSWORD` if supported by your deployment environment. Review SMTP credential injection before enabling in production; do not assume adding variables to `.env` alone wires them into every container.
 
-## Independent ManageEngine API smoke test (recommended before LIVE)
+## ManageEngine API smoke test — command reference
 
 Run this **before** starting containers to verify that the current Endpoint Central deployment accepts the two API calls used by `avm/collectors.py`:
 
