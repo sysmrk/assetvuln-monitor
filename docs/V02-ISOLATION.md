@@ -42,6 +42,24 @@ docker compose config --format json | python3 -c 'import json,sys; d=json.load(s
 
 Confirm the project is `assetvuln-monitor-v02` and HTTPS is bound to `127.0.0.1:8444`. **Do not run** `docker compose down -v` against an existing environment.
 
+## Automated Compose collision check
+
+Once you have **two separate checkouts**, create their private `.env` and `config/application.yaml` files, then run from the v0.2 checkout:
+
+```bash
+python3 scripts/check_compose_isolation.py \
+  --baseline-dir /opt/src/assetvuln-monitor \
+  --candidate-dir .
+```
+
+This **read-only** command runs `docker compose config --format json` for both checkouts. It compares project names, named volumes, Docker networks, published host ports, named containers and bind-mount source paths. A conflict prints `FAIL` and returns exit code 1; failure to resolve a Compose file returns 2. No containers start or stop and the tool does not print expanded passwords. A PASS verifies **configuration isolation only**, not actual runtime behavior or operational backups.
+
+To run only the unit tests without Docker:
+
+```bash
+python3 -m pytest -q tests/test_compose_isolation.py
+```
+
 ## Start and stop
 
 ```bash
@@ -52,7 +70,7 @@ docker compose logs --tail=100 worker
 docker compose stop
 ```
 
-If both versions run on the same Docker daemon, verify their resolved Compose project names before any `up`, `stop`, `down`, or backup operation. The new namespace and port separation have been implemented in Git but **have not been runtime-tested** here.
+If both versions run on the same Docker daemon, run the collision checker and verify resolved Compose project names before any `up`, `stop`, `down`, or backup operation. The new namespace and port separation have been implemented in Git but **have not been runtime-tested** here.
 
 ## Rollback
 
