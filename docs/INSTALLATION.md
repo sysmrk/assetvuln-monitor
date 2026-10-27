@@ -182,6 +182,20 @@ Create `.env` yourself with `cp example.env .env`, replace **all** `CHANGE_ME_*`
 
 In `config/application.yaml`, set `notifications.email_enabled: true`, then set `notifications.smtp_host`, `smtp_port`, `smtp_starttls`, `sender`, and `recipients`. Authentication uses `SMTP_USER` and `SMTP_PASSWORD` if supported by your deployment environment. Review SMTP credential injection before enabling in production; do not assume adding variables to `.env` alone wires them into every container.
 
+## Independent ManageEngine API smoke test (recommended before LIVE)
+
+Run this **before** starting containers to verify that the current Endpoint Central deployment accepts the two API calls used by `avm/collectors.py`:
+
+```bash
+# Set manageengine.url in config/application.yaml first.
+# Put the read-only API token in secrets/manageengine_token.
+python3 scripts/test_manageengine_api.py
+# Optional: python3 scripts/test_manageengine_api.py --resource-id 12345
+# Optional custom CA: python3 scripts/test_manageengine_api.py --ca-bundle secrets/certs/org-ca.pem
+```
+
+The script lists the two GET endpoints at startup, validates JSON list shapes, prints PASS/FAIL/SKIP, and never prints the API token or full response. It does not write to ManageEngine, start Docker, or modify the database. Only page one and one selected computer are tested; successful output does not establish full pagination or field compatibility.
+
 ## 4. Verification and limitations
 
 ```bash
