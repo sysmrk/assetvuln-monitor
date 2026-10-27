@@ -9,10 +9,10 @@ v0.2 focuses on **reliable inventory and defensible software-to-vulnerability id
 ## Milestone 0 — Development isolation and quality gates
 
 - [x] Support independent Docker Compose project names, networks, volumes and HTTPS ports for simultaneous v0.1/v0.2 testing (configuration implemented; runtime validation pending).
-- [ ] Document an isolated v0.2 installation; never reuse v0.1 production/demo database volumes.
-- [ ] Add CI checks: Python unit tests, syntax/lint checks, Docker Compose config validation, secret scanning where available.
-- [ ] Test existing standalone Endpoint Central API smoke test against a controlled mock; real integration tests require an approved Endpoint Central instance.
-- [ ] Preserve a clear migration/rollback path.
+- [x] Document an isolated v0.2 installation, read-only collision checker and rollback; **coexistence still requires Docker runtime validation**.
+- [x] Add GitHub Actions checks for Python unit tests, compile/shell syntax and Docker Compose config; **broader linting and secret-scanning policy remain open**.
+- [x] Add mocked tests for the standalone GET-only Endpoint Central API smoke test; **real API verification remains open**.
+- [x] Document separate deployment and rollback; **no database migration implemented or needed yet for the offline tooling**.
 
 **Exit criteria:** v0.2 can start and stop without affecting a running v0.1 deployment.
 
@@ -21,17 +21,17 @@ v0.2 focuses on **reliable inventory and defensible software-to-vulnerability id
 - [ ] Validate actual Endpoint Central API response fields and pagination across versions.
 - [ ] Record API status, pages read, item counts, schema failures, and collection timestamps without leaking credentials.
 - [ ] Avoid marking unseen assets inactive after partial/incomplete collection.
-- [ ] Build data-quality metrics: unmapped products, unknown versions, duplicate software identities, missing vendor values.
+- [ ] Build full runtime data-quality metrics; the offline CLI now counts unique, approved and unmapped products, plus review candidates.
 
 **Exit criteria:** ingestion is measurable and fails closed on partial/invalid data.
 
 ## Milestone 2 — Software normalization and controlled mapping
 
-- [ ] Normalize vendor, software name and version while retaining raw source values.
-- [ ] Model candidate package identities (ecosystem, package name, optional PURL/CPE) separately from approved identities.
-- [ ] Add confidence and evidence for each candidate; never auto-promote fuzzy matches into confirmed vulnerability findings.
+- [x] Implement standalone conservative Unicode/whitespace identity normalization and preserve raw inputs (offline prototype; runtime integration pending).
+- [x] Model review-only candidate package identities from existing approved catalogue in an offline report; **no persisted review store or PURL/CPE engine yet**.
+- [x] Add explainable string similarity and source/evidence labels; explicitly **not** a probability/confidence of product identity and never auto-promote.
 - [ ] Provide analyst approval/rejection and audit trail; begin with CLI or a simple review interface.
-- [ ] Keep demo and live mapping sources separate.
+- [x] Keep demo and live mapping sources separate; offline sample catalog is synthetic and separate from both.
 
 **Exit criteria:** reviewers can explain and reproduce every approved mapping.
 
@@ -54,6 +54,13 @@ Asset criticality, EPSS/KEV enrichment, risk prioritization, vulnerability lifec
 2. Run unit tests and Compose validation for each feature; record what could not be tested.
 3. Do not push experimental code to `main`.
 4. Merge into `main` only after user approval and a reviewed pull request.
+
+## What has been implemented in the current development branch
+
+- Read-only Compose collision checker: `scripts/check_compose_isolation.py`; unit tests cover project, volume, network, bind and host-port overlaps.
+- Offline normalization/suggestion core: `avm/normalization.py`, `scripts/suggest_mappings.py`, synthetic examples and test coverage.
+- GitHub Actions quality workflow: `.github/workflows/v02-quality.yml` (CI execution results not yet independently verified).
+- Installation and configuration documentation updated for the `develop/v0.2` checkout.
 
 ## Current constraints
 
