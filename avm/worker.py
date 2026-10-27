@@ -15,6 +15,7 @@ from avm.models import (Asset, Software, Installation, Vulnerability, AffectedPa
 from avm.collectors import ManageEngineCollector, CveNowCollector
 from avm.demo import inventory as demo_inventory, vulnerabilities as demo_vulnerabilities
 from avm.matching import extract_affected, is_affected
+from avm.normalization import normalized_label, runtime_lookup
 
 logging.basicConfig(level=os.environ.get('LOG_LEVEL','INFO'),
                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
@@ -32,11 +33,10 @@ def timestamp(s):
 
 def mappings(cfg):
     data = yaml.safe_load(Path(cfg['matching']['mappings_file']).read_text()) or {}
-    lookup = {}
-    for item in data.get('products', []):
-        key = (item['name'].casefold().strip(), item['vendor'].casefold().strip())
-        lookup[key] = (item['ecosystem'].casefold().strip(), item['package'].casefold().strip())
-    return lookup
+    if not isinstance(data, dict):
+        raise ValueError('Software mappings YAML must be an object')
+    # Only explicit approved identities are loaded. Fuzzy suggestions are never used.
+    return runtime_lookup(data.get('products', []))
 
 
 def upsert_inventory(session, records, lookup):
@@ -65,7 +65,7 @@ def upsert_inventory(session, records, lookup):
             if software is None:
                 software = Software(name=name, vendor=vendor)
                 session.add(software)
-            identity = lookup.get((name.casefold(), vendor.casefold()))
+            identity = lookup.get((normalized_label(name), normalized_label(vendor)))
             software.ecosystem = identity[0] if identity else None
             software.package_name = identity[1] if identity else None
             session.flush()
