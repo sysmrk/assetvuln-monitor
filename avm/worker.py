@@ -15,6 +15,11 @@ from avm.models import (Asset, Software, Installation, Vulnerability, AffectedPa
 from avm.collectors import ManageEngineCollector, CveNowCollector
 from avm.demo import inventory as demo_inventory, vulnerabilities as demo_vulnerabilities
 from avm.matching import extract_affected, is_affected
+from avm.normalization import normalized_label, runtime_lookup
+from avm.mapping_review import approved_runtime_lookup, refresh_review_queue
+from avm.asset_context import load_asset_context, apply_asset_context
+from avm.lifecycle import recalculate_findings
+from avm.threat_intel import PublicThreatIntel, enrich_vulnerabilities
 
 logging.basicConfig(level=os.environ.get('LOG_LEVEL','INFO'),
                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
@@ -30,16 +35,25 @@ def timestamp(s):
         return None
 
 
-def mappings(cfg):
+def mapping_rows(cfg):
     data = yaml.safe_load(Path(cfg['matching']['mappings_file']).read_text()) or {}
-    lookup = {}
-    for item in data.get('products', []):
-        key = (item['name'].casefold().strip(), item['vendor'].casefold().strip())
-        lookup[key] = (item['ecosystem'].casefold().strip(), item['package'].casefold().strip())
-    return lookup
+    if not isinstance(data, dict) or not isinstance(data.get('products'), list):
+        raise ValueError('Software mappings must contain a products list')
+    return data['products']
 
 
-def upsert_inventory(session, records, lookup):
+def mappings(cfg, session=None):
+    # Existing callers/tests can read YAML alone. Runtime merges *approved*
+    # database identities; proposals never influence CVE matching.
+    rows = mapping_rows(cfg)
+    return runtime_lookup(rows) if session is None else approved_runtime_lookup(session, rows)
+
+
+def upsert_inventory(session, records, lookup, asset_context=None):
+    # Never deactivate an existing fleet based on an unexpectedly empty scan.
+    records = list(records)
+    if not records and session.scalar(select(Asset.id).where(Asset.active.is_(True)).limit(1)):
+        raise ValueError('Empty inventory would deactivate known assets; keeping previous state')
     stamp = now()
     seen_assets, seen_installs = set(), set()
     for asset_data, packages in records:
@@ -54,6 +68,8 @@ def upsert_inventory(session, records, lookup):
         for k in ('hostname','fqdn','ip_address','os_name','os_version','domain','agent_status'):
             setattr(asset, k, asset_data.get(k) or '')
         asset.active, asset.last_seen = True, stamp
+        if asset_context is not None:
+            apply_asset_context(asset, asset_context)
         session.flush()
         for item in packages:
             name = (item.get('name') or '').strip()
@@ -65,7 +81,7 @@ def upsert_inventory(session, records, lookup):
             if software is None:
                 software = Software(name=name, vendor=vendor)
                 session.add(software)
-            identity = lookup.get((name.casefold(), vendor.casefold()))
+            identity = lookup.get((normalized_label(name), normalized_label(vendor)))
             software.ecosystem = identity[0] if identity else None
             software.package_name = identity[1] if identity else None
             session.flush()
@@ -114,12 +130,19 @@ def upsert_vulnerabilities(session, raw_entries):
             v.cvss = None
         v.severity = str(entry.get('severity') or ('CRITICAL' if v.cvss and v.cvss >= 9 else
                          'HIGH' if v.cvss and v.cvss >= 7 else 'MEDIUM' if v.cvss and v.cvss >= 4 else 'UNKNOWN')).upper()
-        try:
+        # Live KEV/EPSS rankings require separate official-feed provenance.
+        # Keep synthetic demo indicators for tests, never treat advisory hints
+        # as confirmed CISA/FIRST intelligence.
+        v.synthetic = entry.get('synthetic') is True
+        if v.synthetic:
             epss = entry.get('epss')
-            v.epss = float(epss) if epss is not None and not isinstance(epss, dict) else None
-        except (ValueError, TypeError):
-            v.epss = None
-        v.kev = entry.get('kev', False) is True or entry.get('isKev', False) is True
+            try:
+                v.epss = float(epss) if epss is not None and 0 <= float(epss) <= 1 else None
+            except (ValueError, TypeError):
+                v.epss = None
+            v.kev = entry.get('kev') is True or entry.get('isKev') is True
+        else:
+            v.kev = bool(v.kev_verified)
         v.published_at = timestamp(entry.get('publishedAt') or entry.get('published'))
         v.modified_at = timestamp(entry.get('modifiedAt') or entry.get('updatedAt') or entry.get('modified'))
         v.retrieved_at = now()
@@ -136,37 +159,9 @@ def upsert_vulnerabilities(session, raw_entries):
     return processed
 
 
-def recalculate(session):
-    stamp = now()
-    matches = set()
-    packages = {}
-    for affected in session.scalars(select(AffectedPackage)).all():
-        packages.setdefault((affected.ecosystem, affected.package_name), []).append(affected)
-    soft = {s.id: s for s in session.scalars(select(Software)).all()}
-    for install in session.scalars(select(Installation).where(Installation.active == True)).all():
-        product = soft.get(install.software_id)
-        if not product or not product.ecosystem or not product.package_name:
-            continue
-        for affected in packages.get((product.ecosystem, product.package_name), []):
-            result = is_affected(install.version, affected.affected_spec)
-            if result is not True:
-                continue
-            identity = (install.id, affected.vulnerability_id)
-            if identity in matches:
-                continue
-            matches.add(identity)
-            finding = session.scalar(select(Finding).where(Finding.installation_id == install.id,
-                                                           Finding.vulnerability_id == affected.vulnerability_id))
-            if finding is None:
-                finding = Finding(installation_id=install.id, vulnerability_id=affected.vulnerability_id)
-                session.add(finding)
-            finding.active, finding.last_detected = True, stamp
-            finding.confidence = 'structured-range'
-            finding.evidence = f'Exact mapped package identity and affected-version evidence for {install.version}; verify vendor advisories/backports.'
-    for finding in session.scalars(select(Finding)).all():
-        if (finding.installation_id, finding.vulnerability_id) not in matches:
-            finding.active = False
-    return len(matches)
+def recalculate(session, allow_disappearance=False, sla_days=None):
+    """Legacy public entrypoint; delegate to the versioned evidence lifecycle."""
+    return recalculate_findings(session, allow_disappearance=allow_disappearance, sla_days=sla_days)
 
 
 def record_run(session, source, fn):
@@ -224,17 +219,31 @@ def main():
     log.info('Started in %s mode; ManageEngine permissions: GET-only', mode)
     last_inventory = 0
     last_cve = 0
+    last_intel = 0
     while True:
         current = time.monotonic()
         run_match = False
+        inventory_success = False
         with factory() as session:
             if not last_inventory or current - last_inventory >= int(cfg['manageengine']['sync_minutes'])*60:
                 try:
-                    lookup = mappings(cfg)
+                    operator_rows = mapping_rows(cfg)
+                    lookup = approved_runtime_lookup(session, operator_rows)
+                    context = load_asset_context(os.environ.get('AVM_ASSET_CONTEXT',
+                                                                '/opt/avm/config/asset-context.yaml'))
                     incoming = demo_inventory() if mode == 'demo' else ManageEngineCollector(cfg['manageengine']).collect()
-                    count = record_run(session, 'inventory', lambda: upsert_inventory(session, incoming, lookup))
+
+                    def write_inventory_and_reviews():
+                        count = upsert_inventory(session, incoming, lookup, asset_context=context)
+                        # Same transaction: failed/partial inventory never seeds reviews.
+                        created = refresh_review_queue(session, operator_rows)
+                        log.info('Mapping proposals queued for human review: %s', created)
+                        return count
+
+                    count = record_run(session, 'inventory', write_inventory_and_reviews)
                     log.info('Inventory synchronized: %s assets', count)
                     run_match = True
+                    inventory_success = True
                     last_inventory = current
                 except Exception:
                     log.exception('Inventory synchronization FAILED; previous data preserved')
@@ -249,9 +258,34 @@ def main():
                 except Exception:
                     log.exception('CVE synchronization FAILED; previous data preserved')
                     last_cve = current
+            # One daily public GET-only refresh for real CVEs; disabled in demo.
+            intel_cfg = cfg.get('threat_intelligence', {})
+            intel_interval = max(1, int(intel_cfg.get('sync_hours', 24))) * 3600
+            if (mode == 'live' and intel_cfg.get('enabled', True)
+                    and (not last_intel or current - last_intel >= intel_interval)):
+                try:
+                    source = PublicThreatIntel()
+                    known_ids = [row.id for row in session.scalars(select(Vulnerability))
+                                 if not row.synthetic]
+                    kev_catalog = source.fetch_kev()
+                    epss_values = source.fetch_epss(known_ids)
+                    updated = record_run(session, 'threat_intel',
+                                         lambda: enrich_vulnerabilities(
+                                             session, kev_catalog=kev_catalog,
+                                             epss_values=epss_values))
+                    log.info('Daily public threat intelligence updated for %s CVEs', updated)
+                    last_intel = current
+                    run_match = True
+                except Exception:
+                    log.exception('Threat intelligence refresh FAILED; preserving existing values')
+                    # Back off for one hour, not a full day, after a transient error.
+                    last_intel = current - intel_interval + 3600
             if run_match:
                 try:
-                    count = record_run(session, 'matching', lambda: recalculate(session))
+                    count = record_run(session, 'matching',
+                                       lambda: recalculate(session,
+                                                           allow_disappearance=inventory_success,
+                                                           sla_days=cfg.get('risk', {}).get('sla_days')))
                     log.info('Active matches: %s', count)
                     notify(session, cfg, mode == 'demo')
                 except Exception:

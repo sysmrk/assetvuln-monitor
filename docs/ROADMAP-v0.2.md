@@ -8,11 +8,11 @@ v0.2 focuses on **reliable inventory and defensible software-to-vulnerability id
 
 ## Milestone 0 — Development isolation and quality gates
 
-- [ ] Support independent Docker Compose project names, networks, volumes and HTTPS ports for simultaneous v0.1/v0.2 testing.
-- [ ] Document an isolated v0.2 installation; never reuse v0.1 production/demo database volumes.
-- [ ] Add CI checks: Python unit tests, syntax/lint checks, Docker Compose config validation, secret scanning where available.
-- [ ] Test existing standalone Endpoint Central API smoke test against a controlled mock; real integration tests require an approved Endpoint Central instance.
-- [ ] Preserve a clear migration/rollback path.
+- [x] Support independent Docker Compose project names, networks, volumes and HTTPS ports for simultaneous v0.1/v0.2 testing (configuration implemented; runtime validation pending).
+- [x] Document an isolated v0.2 installation, read-only collision checker and rollback; **coexistence still requires Docker runtime validation**.
+- [x] Add GitHub Actions checks for Python unit tests, compile/shell syntax and Docker Compose config; **broader linting and secret-scanning policy remain open**.
+- [x] Add mocked tests for the standalone GET-only Endpoint Central API smoke test; **real API verification remains open**.
+- [x] Document separate deployment and rollback; **no database migration implemented or needed yet for the offline tooling**.
 
 **Exit criteria:** v0.2 can start and stop without affecting a running v0.1 deployment.
 
@@ -21,26 +21,26 @@ v0.2 focuses on **reliable inventory and defensible software-to-vulnerability id
 - [ ] Validate actual Endpoint Central API response fields and pagination across versions.
 - [ ] Record API status, pages read, item counts, schema failures, and collection timestamps without leaking credentials.
 - [ ] Avoid marking unseen assets inactive after partial/incomplete collection.
-- [ ] Build data-quality metrics: unmapped products, unknown versions, duplicate software identities, missing vendor values.
+- [x] Add runtime reporting views for active distinct software products, unknown vendors/versions, mapping coverage and review state. **Performance and accuracy at enterprise scale not yet validated**.
 
 **Exit criteria:** ingestion is measurable and fails closed on partial/invalid data.
 
 ## Milestone 2 — Software normalization and controlled mapping
 
-- [ ] Normalize vendor, software name and version while retaining raw source values.
-- [ ] Model candidate package identities (ecosystem, package name, optional PURL/CPE) separately from approved identities.
-- [ ] Add confidence and evidence for each candidate; never auto-promote fuzzy matches into confirmed vulnerability findings.
-- [ ] Provide analyst approval/rejection and audit trail; begin with CLI or a simple review interface.
-- [ ] Keep demo and live mapping sources separate.
+- [x] Implement conservative Unicode/whitespace identity normalization and preserve raw inputs; integrate approved-only exact normalized keys into the v0.2 worker.
+- [x] Persist review-only proposals in PostgreSQL with explicit status and evidence; **PURL/CPE and authenticated review UI remain open**.
+- [x] Add explainable string similarity and source/evidence labels; explicitly **not** a probability/confidence of product identity and never auto-promote.
+- [x] Implement privileged CLI for propose/approve/reject/history, separate manual proposer/reviewer identifiers, and application-level audit events. **SSO/RBAC and immutable audit store remain open**.
+- [x] Keep demo and live mapping sources separate; offline sample catalog is synthetic and separate from both.
 
 **Exit criteria:** reviewers can explain and reproduce every approved mapping.
 
 ## Milestone 3 — Mapping coverage dashboard
 
-- [ ] Distinguish discovered software, verified mapped software, and software with supported advisory coverage.
-- [ ] Display coverage by vendor, OS, business segment and last successful sync.
-- [ ] Show candidates awaiting review, unmapped inventory and trends.
-- [ ] Define explicit denominators to avoid misleading coverage percentages.
+- [x] Distinguish active software, approved mapping identity and existence of **ingested** advisory records (limited feed; not comprehensive CVE coverage).
+- [x] Display coverage by vendor, OS, domain and latest ingestion success/failure timestamp; **business criticality attributes not available yet**.
+- [x] Show pending reviews, audit history and unmapped active products. **Historical trend snapshots remain open**.
+- [x] Define active distinct-product denominators and explicitly separate mapping coverage from ingested advisory presence.
 
 **Exit criteria:** dashboards make gaps and uncertainty visible, not just positive matches.
 
@@ -55,8 +55,18 @@ Asset criticality, EPSS/KEV enrichment, risk prioritization, vulnerability lifec
 3. Do not push experimental code to `main`.
 4. Merge into `main` only after user approval and a reviewed pull request.
 
+## What has been implemented in the current development branch
+
+- Read-only Compose collision checker: `scripts/check_compose_isolation.py`; unit tests cover project, volume, network, bind and host-port overlaps.
+- Offline normalization/suggestion core: `avm/normalization.py`, `scripts/suggest_mappings.py`, synthetic examples and test coverage.
+- GitHub Actions quality workflow: `.github/workflows/v02-quality.yml`, now provisioning throwaway PostgreSQL 17 for schema/reporting/permission integration checks (CI execution results not yet independently verified).
+- Installation and configuration documentation updated for the `develop/v0.2` checkout.
+- `avm/mapping_review.py` persists pending proposals, independent reviewer decisions and approved-only identities; `avm/review_cli.py` manages them with a privileged CLI.
+- `avm/models.py` provides 3 review tables and 8 new `reporting.*` views; `avm/dashboards.py` provisions the seventh dashboard.
+- SQLite unit tests exercise approval and decision history; a PostgreSQL integration test is included in CI. **Metabase end-to-end and real integration remain pending**.
+
 ## Current constraints
 
-- Real Endpoint Central responses and CVE provider compatibility are not yet verified.
-- Existing v0.1 Compose project name is fixed; **do not start both branches on the same Docker daemon yet**.
+- Real Endpoint Central responses and CVE provider compatibility are not yet verified. Runtime worker mapping changes are covered by code-level tests but not Docker/live validation.
+- v0.1 Compose project name is fixed. v0.2 defaults to a distinct project and port; **runtime coexistence is not yet verified**, so check resolved Compose configuration before starting both.
 - `config/product-mappings.live.yaml` intentionally begins empty to prevent unsupported correlations.

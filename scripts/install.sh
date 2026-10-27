@@ -13,46 +13,73 @@ case "${1:-}" in
   *) usage; exit 2 ;;
 esac
 
-for program in docker openssl; do
+for program in docker openssl python3; do
   if ! command -v "$program" >/dev/null 2>&1; then
-    echo "ERROR: $program is required. Please install it first." >&2
+    echo "ERROR: $program is required." >&2
     exit 1
   fi
 done
 if ! docker compose version >/dev/null 2>&1; then
-  echo 'ERROR: Docker Compose v2 plugin is required.' >&2
+  echo 'ERROR: Docker Compose v2 is required.' >&2
   exit 1
 fi
 if ! docker info >/dev/null 2>&1; then
-  echo 'ERROR: Docker daemon is not accessible. Start Docker Desktop/Engine.' >&2
+  echo 'ERROR: Docker daemon is inaccessible.' >&2
   exit 1
 fi
+
+# Configure fresh Demo automatically. Never echo auto-generated passwords.
+python3 scripts/prepare_env.py --mode "$mode"
+project_name="$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' .env | tail -n 1 | tr -d '"')"
+if [[ ! "$project_name" =~ ^[a-z0-9][a-z0-9_-]*$ ||
+      "$project_name" == assetvuln-monitor ||
+      "$project_name" == assetvuln-monitor-v02 ]]; then
+  echo 'ERROR: Use a distinct valid COMPOSE_PROJECT_NAME for v0.3.' >&2
+  exit 1
+fi
+if [[ -n "${COMPOSE_PROJECT_NAME:-}" && "$COMPOSE_PROJECT_NAME" != "$project_name" ]]; then
+  echo 'ERROR: Shell COMPOSE_PROJECT_NAME conflicts with .env.' >&2
+  exit 1
+fi
+
+# Never attach a fresh checkout to an existing project's PostgreSQL volume.
+# An intentional recovery must use a verified backup/restore procedure instead.
+if [[ ! -f secrets/installation-mode ]] &&
+   docker volume inspect "${project_name}_postgres_data" >/dev/null 2>&1; then
+  echo 'ERROR: This Compose project already owns a PostgreSQL volume. Use a new project name to avoid data mixing.' >&2
+  exit 1
+fi
+
+# Prevent accidentally reusing a Demo database as Live (or vice versa).
+if [[ -f secrets/installation-mode ]]; then
+  installed_mode="$(cat secrets/installation-mode)"
+  if [[ "$installed_mode" != "$mode" ]]; then
+    echo 'ERROR: Cannot switch an existing project between Demo and Live. Use a new Compose project/volume.' >&2
+    exit 1
+  fi
+fi
+
 mkdir -p secrets/tls secrets/certs
 if [[ ! -f config/application.yaml ]]; then
   cp config/application.example.yaml config/application.yaml
 fi
+if [[ ! -f config/asset-context.yaml ]]; then
+  cp config/asset-context.example.yaml config/asset-context.yaml
+fi
 if [[ "$mode" == demo ]]; then
   sed -i 's/^  mode: live *# demo | live/  mode: demo                       # demo | live/' config/application.yaml
-fi
-if [[ "$mode" == live ]]; then
+else
   sed -i 's/^  mode: demo *# demo | live/  mode: live                       # demo | live/' config/application.yaml
 fi
 if [[ ! -f secrets/manageengine_token ]]; then
   : > secrets/manageengine_token
 fi
-if [[ ! -f .env ]]; then
-  echo 'ERROR: .env is missing. Run: cp example.env .env; then edit .env before installing.' >&2
-  exit 1
-fi
-if [[ ! -s .env ]]; then
-  echo 'ERROR: .env is empty. Configure it from example.env before installing.' >&2
-  exit 1
-fi
+
 # Validate required credentials without printing secret values or modifying .env.
 # Do not source .env as shell code: validate with Compose interpolation instead.
 required=(POSTGRES_PASSWORD APP_DB_PASSWORD REPORT_DB_PASSWORD MB_DB_PASSWORD METABASE_ADMIN_PASSWORD)
 for key in "${required[@]}"; do
-  value="$(docker compose config --format json 2>/dev/null | python3 -c '
+  value="$(docker compose --profile setup config --format json 2>/dev/null | python3 -c '
 import json,sys
 try:
     c=json.load(sys.stdin)
@@ -69,6 +96,16 @@ except Exception:
   fi
 done
 chmod 600 .env secrets/manageengine_token config/application.yaml
+if [[ "$(id -u)" == 0 ]]; then
+  # Root-launched setup must not silently run the Worker as root.
+  worker_uid="$(sed -n 's/^HOST_UID=//p' .env | tail -n 1)"
+  worker_gid="$(sed -n 's/^HOST_GID=//p' .env | tail -n 1)"
+  if [[ "$worker_uid" == 0 || "$worker_gid" == 0 ]]; then
+    echo 'ERROR: Root-run installation requires a non-root HOST_UID/HOST_GID in .env.' >&2
+    exit 1
+  fi
+  chown "$worker_uid:$worker_gid" secrets/manageengine_token config/application.yaml
+fi
 if [[ ! -s secrets/tls/tls.key || ! -s secrets/tls/tls.crt ]]; then
   echo 'Generating temporary TLS certificate for localhost (browser warning is expected)...'
   openssl req -x509 -nodes -newkey rsa:3072 -sha256 -days 365 \
@@ -104,6 +141,14 @@ fi
 
 echo 'Checking Compose configuration...'
 docker compose config --quiet
+resolved_name="$(docker compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["name"])')"
+if [[ "$resolved_name" != "$project_name" ]]; then
+  echo 'ERROR: Resolved Docker project does not match .env isolation identity.' >&2
+  exit 1
+fi
+# Create the mode marker before starting any container (also protects failed first installs).
+printf '%s\n' "$mode" > secrets/installation-mode
+chmod 600 secrets/installation-mode
 echo 'Building application and starting services...'
 docker compose up -d --build postgres worker metabase nginx
 
@@ -118,7 +163,7 @@ echo '==============================================================='
 echo '  AssetVuln Monitor - installation finished'
 echo '  URL: see PUBLIC_URL in .env'
 echo '  Login email: see METABASE_ADMIN_EMAIL in .env'
-echo '  Initial admin password: configured in .env (METABASE_ADMIN_PASSWORD)'
+echo '  Initial admin password: view locally with grep ^METABASE_ADMIN_PASSWORD= .env'
 echo "  Data source mode: $mode"
 echo '  Self-signed TLS warning: expected for local WSL demo.'
 echo '  View logs: docker compose logs -f worker'

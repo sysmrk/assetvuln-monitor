@@ -12,3 +12,9 @@ __pycache__/
 .pytest_cache/
 *.pyc
 *.log
+
+# Local review, risk and inventory artifacts can contain confidential host data.
+config/asset-context.yaml
+backups/
+risk-review*.json
+mapping-review*.json
