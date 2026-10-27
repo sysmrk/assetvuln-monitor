@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only comparison of resolved v0.1 and v0.2 Docker Compose configs.
+"""Read-only comparison of resolved Docker Compose configs from two different checkouts.
 
 Runs 'docker compose config --format json', never starts/stops containers.
 No secret/environment values are emitted. Can consume saved JSON for unit tests.
@@ -52,8 +52,8 @@ def isolation_errors(baseline, candidate):
     candidate_name = candidate.get('name')
     if not baseline_name or not candidate_name or baseline_name == candidate_name:
         errors.append('Compose project names must be non-empty and different')
-    if candidate_name == 'assetvuln-monitor':
-        errors.append('v0.2 must not use the fixed v0.1 project name')
+    if candidate_name in ('assetvuln-monitor', 'assetvuln-monitor-v02'):
+        errors.append('v0.3 must not reuse a v0.1/v0.2 Compose project name')
     for kind in ('volumes', 'networks'):
         shared = _resource_names(baseline, kind) & _resource_names(candidate, kind)
         if shared:
@@ -86,10 +86,10 @@ def _resolve(directory):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--baseline-dir', type=Path, help='Checked-out v0.1 directory')
-    parser.add_argument('--candidate-dir', type=Path, default=Path('.'), help='v0.2 directory')
-    parser.add_argument('--baseline-json', type=Path, help='Pre-resolved v0.1 Compose JSON')
-    parser.add_argument('--candidate-json', type=Path, help='Pre-resolved v0.2 Compose JSON')
+    parser.add_argument('--baseline-dir', type=Path, help='Previously deployed baseline checkout directory')
+    parser.add_argument('--candidate-dir', type=Path, default=Path('.'), help='Candidate checkout directory')
+    parser.add_argument('--baseline-json', type=Path, help='Pre-resolved baseline Compose JSON')
+    parser.add_argument('--candidate-json', type=Path, help='Pre-resolved candidate Compose JSON')
     args = parser.parse_args(argv)
     if (args.baseline_dir is None) == (args.baseline_json is None):
         parser.error('provide exactly one of --baseline-dir or --baseline-json')
@@ -99,8 +99,8 @@ def main(argv=None):
         left = json.loads(args.baseline_json.read_text()) if args.baseline_json else _resolve(args.baseline_dir)
         right = json.loads(args.candidate_json.read_text()) if args.candidate_json else _resolve(args.candidate_dir)
         errors = isolation_errors(left, right)
-        print(f'v0.1 Compose project: {left.get("name", "(missing)")}')
-        print(f'v0.2 Compose project: {right.get("name", "(missing)")}')
+        print(f'Baseline Compose project: {left.get("name", "(missing)")}')
+        print(f'Candidate Compose project: {right.get("name", "(missing)")}')
         if errors:
             for error in errors:
                 print(f'[FAIL] {error}')
