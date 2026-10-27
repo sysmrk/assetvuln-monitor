@@ -5,7 +5,7 @@
 # For production, set mode to live and configure the ManageEngine section.
 # No remote WRITE, POST, PUT, PATCH or DELETE operations are implemented.
 # Only edit values to the right of ':'. YAML indentation MUST use spaces.
-# Secrets and passwords belong in the generated .env or secrets/ folder.
+# Secrets and passwords belong in your private .env (copied from example.env) or secrets/ folder.
 # ============================================================================
 application:
   mode: demo                       # demo | live
