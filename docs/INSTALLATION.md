@@ -50,12 +50,14 @@ If `docker-compose-v2` is not available in your configured repositories, stop an
 cd /opt/src
 git clone https://github.com/sysmrk/assetvuln-monitor.git
 cd assetvuln-monitor
+cp example.env .env
+nano .env  # replace every CHANGE_ME_* with a unique strong secret
 
 # Confirm runtime availability:
 docker compose version
 docker info --format '{{.ServerVersion}}'
 
-# Build and start Docker services, create local credentials and TLS,
+# Build and start Docker services using your configured .env, create local TLS,
 # populate synthetic data, and provision the Metabase dashboards:
 ./install.sh --demo
 
@@ -65,7 +67,7 @@ docker compose logs --tail=100 worker
 docker compose logs --tail=100 metabase
 docker compose logs --tail=100 nginx
 
-# Show the generated Metabase login (do not paste passwords in tickets):
+# Show the configured Metabase login (do not paste passwords in tickets):
 grep '^METABASE_ADMIN_EMAIL=' .env
 grep '^METABASE_ADMIN_PASSWORD=' .env
 ```
@@ -96,6 +98,8 @@ sudo chown "$(id -u):$(id -g)" /opt/assetvuln-live
 cd /opt/assetvuln-live
 git clone https://github.com/sysmrk/assetvuln-monitor.git
 cd assetvuln-monitor
+cp example.env .env
+nano .env  # set unique passwords, real admin email, PUBLIC_URL and bind settings
 
 # Create the runtime YAML from the documented template:
 cp config/application.example.yaml config/application.yaml
@@ -153,11 +157,11 @@ docker compose logs --tail=200 worker
 docker compose logs --tail=200 metabase
 ```
 
-For a network-facing deployment, **before exposing the service** edit `.env` after its first generation, set the correct `BIND_IP`, `HTTPS_PORT` and `PUBLIC_URL`, and install a trusted certificate and matching private key at `secrets/tls/tls.crt` and `secrets/tls/tls.key`. Rerun `./install.sh --live`. The default `BIND_IP=127.0.0.1` exposes HTTPS only on the local host. Restrict firewall access and validate Metabase authentication.
+For a network-facing deployment, configure `BIND_IP`, `HTTPS_PORT` and `PUBLIC_URL` in `.env` **before running the installer**; install a trusted certificate and matching private key at `secrets/tls/tls.crt` and `secrets/tls/tls.key` before starting. The default bind is loopback only. The default `BIND_IP=127.0.0.1` exposes HTTPS only on the local host. Restrict firewall access and validate Metabase authentication.
 
-### Generated `.env` — fields and security
+### Administrator-configured `.env` — fields and security
 
-`./install.sh` generates `.env` on first run. Do **not** create sample passwords manually. Review/edit only as necessary:
+Create `.env` yourself with `cp example.env .env`, replace **all** `CHANGE_ME_*` placeholders with independent strong secrets (e.g. `openssl rand -hex 30`), and set `HOST_UID`/`HOST_GID` to the installing user's numeric IDs (`id -u`, `id -g`). The installer validates required credentials and never overwrites `.env`:
 
 | Variable | Purpose |
 |---|---|
