@@ -48,7 +48,18 @@ if [[ ! -s .env ]]; then
   echo 'ERROR: .env is empty. Configure it from example.env before installing.' >&2
   exit 1
 fi
-# Enforce v0.2 namespace isolation before Docker Compose can touch v0.1.\nproject_name="$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' .env | tail -n 1)"\nproject_name="${project_name%\\\"}"\nproject_name="${project_name#\\\"}"\nif [[ ! "$project_name" =~ ^[a-z0-9][a-z0-9_-]*$ || "$project_name" == assetvuln-monitor ]]; then\n  echo 'ERROR: Set a unique COMPOSE_PROJECT_NAME in .env (not assetvuln-monitor).' >&2\n  exit 1\nfi\nif [[ "${COMPOSE_PROJECT_NAME:-}" == assetvuln-monitor ]]; then\n  echo 'ERROR: Shell COMPOSE_PROJECT_NAME points to v0.1; unset it before installing v0.2.' >&2\n  exit 1\nfi\n# Validate required credentials without printing secret values or modifying .env.
+# Enforce v0.2 namespace isolation before Docker Compose can touch v0.1.
+project_name="$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' .env | tail -n 1 | tr -d '"')"
+if [[ ! "$project_name" =~ ^[a-z0-9][a-z0-9_-]*$ || "$project_name" == assetvuln-monitor ]]; then
+  echo 'ERROR: Set a unique COMPOSE_PROJECT_NAME in .env (not assetvuln-monitor).' >&2
+  exit 1
+fi
+if [[ -n "${COMPOSE_PROJECT_NAME:-}" && "${COMPOSE_PROJECT_NAME}" != "$project_name" ]]; then
+  echo 'ERROR: Shell COMPOSE_PROJECT_NAME conflicts with .env; unset it before installing v0.2.' >&2
+  exit 1
+fi
+
+# Validate required credentials without printing secret values or modifying .env.
 # Do not source .env as shell code: validate with Compose interpolation instead.
 required=(POSTGRES_PASSWORD APP_DB_PASSWORD REPORT_DB_PASSWORD MB_DB_PASSWORD METABASE_ADMIN_PASSWORD)
 for key in "${required[@]}"; do
