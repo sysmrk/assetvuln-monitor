@@ -1,3 +1,4 @@
+import pytest
 """Safe finding transitions and risk ranking using an isolated SQLite database."""
 from datetime import datetime, timezone
 from sqlalchemy import create_engine, select, func
@@ -83,4 +84,22 @@ def test_feed_only_refresh_cannot_mark_findings_resolved():
         assert finding.active and finding.workflow_state == 'open'
         actions = db.scalars(select(FindingEvent.action).order_by(FindingEvent.id)).all()
         assert actions == ['detected', 'not_observed', 'reopened']
+    engine.dispose()
+
+
+
+def test_custom_sla_targets_are_validated():
+    engine = create_engine('sqlite+pysqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        _seed(db)
+        with pytest.raises(ValueError, match='requires exactly'):
+            recalculate_findings(db, sla_days={'P1': 3})
+        with pytest.raises(ValueError, match='1..3650'):
+            recalculate_findings(db, sla_days={'P1': 0, 'P2': 10, 'P3': 20, 'P4': 90})
+        custom = {'P1': 3, 'P2': 14, 'P3': 60, 'P4': 120}
+        assert recalculate_findings(db, allow_disappearance=True, sla_days=custom) == 1
+        db.flush()
+        finding = db.scalar(select(Finding))
+        assert 2 <= (finding.sla_due_at - finding.first_detected).days <= 3
     engine.dispose()
