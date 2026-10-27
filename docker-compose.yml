@@ -7,10 +7,10 @@ services:
     environment:
       POSTGRES_DB: avm
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run ./install.sh first}
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run ./install.sh first}
-      REPORT_DB_PASSWORD: ${REPORT_DB_PASSWORD:?Run ./install.sh first}
-      MB_DB_PASSWORD: ${MB_DB_PASSWORD:?Run ./install.sh first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set this variable in .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set this variable in .env}
+      REPORT_DB_PASSWORD: ${REPORT_DB_PASSWORD:?Set this variable in .env}
+      MB_DB_PASSWORD: ${MB_DB_PASSWORD:?Set this variable in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
@@ -28,12 +28,14 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
     restart: unless-stopped
     init: true
     command: ["python", "-m", "avm.worker"]
     environment:
       AVM_CONFIG: /opt/avm/config/application.yaml
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run ./install.sh first}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set this variable in .env}
     volumes:
       - ./config/application.yaml:/opt/avm/config/application.yaml:ro
       - ./config/product-mappings.yaml:/opt/avm/config/product-mappings.yaml:ro
@@ -61,7 +63,7 @@ services:
       MB_DB_PORT: 5432
       MB_DB_DBNAME: metabase
       MB_DB_USER: mb_user
-      MB_DB_PASS: ${MB_DB_PASSWORD:?Run ./install.sh first}
+      MB_DB_PASS: ${MB_DB_PASSWORD:?Set this variable in .env}
       MB_SITE_URL: ${PUBLIC_URL:-https://localhost:8443}
       MB_LOAD_SAMPLE_CONTENT: 'false'
       MB_ANON_TRACKING_ENABLED: 'false'
@@ -88,7 +90,7 @@ services:
       - ./secrets/tls/tls.key:/etc/nginx/tls/tls.key:ro
     depends_on:
       metabase: {condition: service_healthy}
-    networks: [frontend]
+    networks: [frontend, ingress]
     read_only: true
     tmpfs: [/var/cache/nginx, /var/run, /tmp]
     security_opt: [no-new-privileges:true]
@@ -101,10 +103,10 @@ services:
     command: ["python", "-m", "avm.bootstrap"]
     environment:
       AVM_CONFIG: /opt/avm/config/application.yaml
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run ./install.sh first}
-      REPORT_DB_PASSWORD: ${REPORT_DB_PASSWORD:?Run ./install.sh first}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set this variable in .env}
+      REPORT_DB_PASSWORD: ${REPORT_DB_PASSWORD:?Set this variable in .env}
       METABASE_ADMIN_EMAIL: ${METABASE_ADMIN_EMAIL:-admin@example.local}
-      METABASE_ADMIN_PASSWORD: ${METABASE_ADMIN_PASSWORD:?Run ./install.sh first}
+      METABASE_ADMIN_PASSWORD: ${METABASE_ADMIN_PASSWORD:?Set this variable in .env}
       METABASE_INTERNAL_URL: http://metabase:3000
     depends_on:
       postgres: {condition: service_healthy}
@@ -123,5 +125,7 @@ networks:
     internal: true
   frontend:
     internal: true
+  ingress:
+    driver: bridge
   egress:
     driver: bridge
