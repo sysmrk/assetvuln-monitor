@@ -130,16 +130,19 @@ def upsert_vulnerabilities(session, raw_entries):
             v.cvss = None
         v.severity = str(entry.get('severity') or ('CRITICAL' if v.cvss and v.cvss >= 9 else
                          'HIGH' if v.cvss and v.cvss >= 7 else 'MEDIUM' if v.cvss and v.cvss >= 4 else 'UNKNOWN')).upper()
-        # Do not erase fresh public-intelligence signals if the advisory omits them.
-        epss = entry.get('epss')
-        if epss is not None and not isinstance(epss, dict):
+        # Live KEV/EPSS rankings require separate official-feed provenance.
+        # Keep synthetic demo indicators for tests, never treat advisory hints
+        # as confirmed CISA/FIRST intelligence.
+        v.synthetic = entry.get('synthetic') is True
+        if v.synthetic:
+            epss = entry.get('epss')
             try:
-                parsed_epss = float(epss)
-                if 0 <= parsed_epss <= 1:
-                    v.epss = parsed_epss
+                v.epss = float(epss) if epss is not None and 0 <= float(epss) <= 1 else None
             except (ValueError, TypeError):
-                pass
-        v.kev = bool(v.kev) or entry.get('kev') is True or entry.get('isKev') is True
+                v.epss = None
+            v.kev = entry.get('kev') is True or entry.get('isKev') is True
+        else:
+            v.kev = bool(v.kev_verified)
         v.published_at = timestamp(entry.get('publishedAt') or entry.get('published'))
         v.modified_at = timestamp(entry.get('modifiedAt') or entry.get('updatedAt') or entry.get('modified'))
         v.retrieved_at = now()
