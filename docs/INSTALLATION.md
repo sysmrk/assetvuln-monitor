@@ -15,7 +15,7 @@
 | Metabase dashboards | Automatically provisioned | Automatically provisioned |
 | Production approved | No; testing only | **Not yet; validate before production use** |
 
-**Do not switch an existing demo database to live mode.** Synthetic demo records persist in the database. Use a separate fresh deployment/database for real inventory. **Warning:** this Compose file fixes the project name to `assetvuln-monitor`, so a separate checkout directory on the *same Docker daemon* does NOT isolate the named volume.
+**Do not switch an existing demo database to live mode.** Synthetic demo records persist in the database. Use a separate fresh deployment/database for real inventory. **Warning:** give each instance a distinct `COMPOSE_PROJECT_NAME`, `HTTPS_PORT`, database volume namespace and checkout. The v0.2 default project name is `assetvuln-monitor-v02`; for two v0.2 instances, change one of them.
 
 ## 1. Prerequisites — Ubuntu 24.04 / WSL2
 
@@ -48,8 +48,8 @@ If `docker-compose-v2` is not available in your configured repositories, stop an
 ```bash
 # Download the standalone repository:
 cd /opt/src
-git clone https://github.com/sysmrk/assetvuln-monitor.git
-cd assetvuln-monitor
+git clone --branch develop/v0.2 https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-v02
+cd assetvuln-monitor-v02
 cp example.env .env
 nano .env  # replace every CHANGE_ME_* with a unique strong secret
 
@@ -72,7 +72,7 @@ grep '^METABASE_ADMIN_EMAIL=' .env
 grep '^METABASE_ADMIN_PASSWORD=' .env
 ```
 
-Open **https://localhost:8443** on the WSL host browser. The automatically generated localhost certificate is self-signed, so a browser warning is expected in the demo. The six dashboards are automatically provisioned by the bootstrap container. Synthetic advisories are labeled `CVE-DEMO-*` and are not real CVEs.
+Open **https://localhost:8444** on the WSL host browser. The automatically generated localhost certificate is self-signed, so a browser warning is expected in the demo. The six dashboards are automatically provisioned by the bootstrap container. Synthetic advisories are labeled `CVE-DEMO-*` and are not real CVEs.
 
 Useful operational commands:
 
@@ -90,16 +90,16 @@ docker compose start                  # restart, keep persistent data
 
 ## 3. LIVE — real Endpoint Central integration (separate fresh installation)
 
-Use a **separate Docker host/daemon** for the initial live deployment, or first implement and verify distinct Compose project/volume names. A separate directory on the same daemon is **not** sufficient with the current fixed Compose project name. Example on a fresh dedicated host:
+Prefer a separate Docker host for initial Live validation. If sharing a daemon, use a unique `COMPOSE_PROJECT_NAME` and HTTPS port distinct from v0.1 and any running v0.2 Demo installation. Review [v0.2 isolation](V02-ISOLATION.md) and run the Compose collision checker before starting services. Example on a fresh dedicated host:
 
 ```bash
 sudo mkdir -p /opt/assetvuln-live
 sudo chown "$(id -u):$(id -g)" /opt/assetvuln-live
 cd /opt/assetvuln-live
-git clone https://github.com/sysmrk/assetvuln-monitor.git
-cd assetvuln-monitor
+git clone --branch develop/v0.2 https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-v02
+cd assetvuln-monitor-v02
 cp example.env .env
-nano .env  # set unique passwords, real admin email, PUBLIC_URL and bind settings
+nano .env  # set unique COMPOSE_PROJECT_NAME, HTTPS_PORT, passwords and PUBLIC_URL
 
 # Create the runtime YAML from the documented template:
 cp config/application.example.yaml config/application.yaml
@@ -189,6 +189,7 @@ Create `.env` yourself with `cp example.env .env`, replace **all** `CHANGE_ME_*`
 
 | Variable | Purpose |
 |---|---|
+| `COMPOSE_PROJECT_NAME` | Must be unique per installation; e.g. `assetvuln-monitor-v02-live` if Demo already exists on this Docker host |
 | `HOST_UID` / `HOST_GID` | Host owner used by non-root worker to read mode-0600 secrets |
 | `POSTGRES_PASSWORD` | Internal PostgreSQL administrator credential |
 | `APP_DB_PASSWORD` | Application database credential |
@@ -197,8 +198,8 @@ Create `.env` yourself with `cp example.env .env`, replace **all** `CHANGE_ME_*`
 | `METABASE_ADMIN_EMAIL` | Initial Metabase administrator email (set a real one before first bootstrap) |
 | `METABASE_ADMIN_PASSWORD` | Initial Metabase administrator password |
 | `BIND_IP` | Host bind IP; default `127.0.0.1` |
-| `HTTPS_PORT` | External HTTPS port; default `8443` |
-| `PUBLIC_URL` | User-facing URL; default `https://localhost:8443` |
+| `HTTPS_PORT` | External HTTPS port; v0.2 default `8444` (use a different port for every instance) |
+| `PUBLIC_URL` | User-facing URL; default `https://localhost:8444` |
 
 **Changing database passwords after the first initialization does not automatically rotate PostgreSQL role passwords.** For existing installations, use a tested rotation procedure instead of blindly editing `.env`. Keep `.env`, API tokens, and private keys outside version control.
 
@@ -219,6 +220,10 @@ python3 scripts/test_manageengine_api.py
 ```
 
 The script lists the two GET endpoints at startup, validates JSON list shapes, prints PASS/FAIL/SKIP, and never prints the API token or full response. It does not write to ManageEngine, start Docker, or modify the database. Only page one and one selected computer are tested; successful output does not establish full pagination or field compatibility.
+
+## v0.2 offline software normalization
+
+Once an inventory CSV export is available, run `python3 scripts/suggest_mappings.py --inventory-csv /secure/path/software.csv --approved-mappings config/product-mappings.live.yaml --output mapping-review.json` to generate **review-only** candidate suggestions and mapping coverage counts. This does not contact ManageEngine or modify approved mappings. See [Software normalization](SOFTWARE-NORMALIZATION.md). To check v0.1/v0.2 Compose isolation, run `python3 scripts/check_compose_isolation.py --baseline-dir /path/to/v01 --candidate-dir .`.
 
 ## 4. Verification and limitations
 
