@@ -53,7 +53,10 @@ def recalculate_findings(session, *, allow_disappearance=False):
             observed.add(key)
             record = existing.get(key)
             if record is None:
-                record = Finding(installation_id=installed.id, vulnerability_id=cve_id)
+                record = Finding(
+                    installation_id=installed.id, vulnerability_id=cve_id,
+                    confidence='potential-structured-range',
+                    evidence='Approved identity and affected range; requires vendor verification.')
                 session.add(record)
                 session.flush()
                 existing[key] = record
