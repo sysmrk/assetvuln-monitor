@@ -44,6 +44,7 @@ Do not commit actual .env, certificates, credentials, asset-context configuratio
 | cve.max_pages_per_poll | Default 5; intentionally bounded, not a CVE historical backfill |
 | threat_intelligence.enabled | Default true; only Live uses the public feeds |
 | threat_intelligence.sync_hours | Default 24; automatic GET-only refresh |
+| risk.sla_days | Optional P1/P2/P3/P4 SLA targets in days (defaults 7/30/90/180) |
 | matching.mappings_file | Worker path to mounted mapping YAML |
 | notifications.email_enabled | Default false; optional SMTP configuration must be independently verified |
 
@@ -88,7 +89,7 @@ V3 prioritization components (maximum total 100 points):
 
 A KEV entry enforces a floor of 75 priority points (P1) for that *potential match*. Missing signals are reported separately rather than silently represented as known zero evidence. The score is not the likelihood of exploitation.
 
-Priorities: P1 ≥75, P2 ≥50, P3 ≥25, P4 below 25. Default remediation SLA targets: P1 7 days, P2 30, P3 90, P4 180, measured from first observation. SLA calculations are **internal model defaults**, not external regulatory requirements or contractual guarantees; tailor operational policy before use.
+Priorities: P1 ≥75, P2 ≥50, P3 ≥25, P4 below 25. Default remediation SLA targets: P1 7 days, P2 30, P3 90, P4 180, measured from first observation; operators can edit the corresponding risk.sla_days values in the YAML. SLA calculations are **internal model defaults**, not external regulatory requirements or contractual guarantees; tailor operational policy before use.
 
 Risk acceptances last 1–180 days, require a privileged CLI command with evidence-backed explanation and are audited in the app DB. The operator identifier is self-declared; RBAC/SSO is not yet implemented.
 
