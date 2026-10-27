@@ -46,7 +46,7 @@ AssetVuln Monitor is **read-only toward managed Endpoint Central assets**. Exter
 3. Use real TLS certificates, review reverse-proxy headers and restrict exposure beyond localhost.
 4. Add integrated SSO/RBAC and policy-bound risk acceptance; current operator CLI relies on shell/database access.
 5. Verify immutable audit forwarding, patch/version corroboration, product identity and vendor backport handling before relying on findings.
-6. Test PostgreSQL schema upgrades, backup/restore, concurrency and Metabase dashboard provisioning in staging. GitHub Actions only covers unit tests, temporary PostgreSQL and static Compose configuration.
+6. Test PostgreSQL schema upgrades, backup/restore, concurrency and Metabase dashboard provisioning in staging. GitHub Actions covers unit tests, temporary PostgreSQL, static Compose configuration and a successful disposable **synthetic Docker/Metabase Demo startup**. It does not validate a real corporate Endpoint Central system or production network configuration.
 7. Control inventory and report sensitivity; Metabase viewers may see hostnames, installed software, owners and proposed vulnerabilities.
 8. Verify pinned container image digests, supply-chain integrity and current CVEs of the runtime itself.
 
