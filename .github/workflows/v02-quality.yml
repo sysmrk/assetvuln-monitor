@@ -15,6 +15,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout v0.1 main as separate baseline
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: baseline-v01
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -36,6 +41,11 @@ jobs:
           cp config/application.example.yaml config/application.yaml
           mkdir -p secrets/certs secrets/tls
           : > secrets/manageengine_token
+          cp baseline-v01/example.env baseline-v01/.env
+          sed -i 's/CHANGE_ME_[A-Z_]*/ci-dummy-credential/g' baseline-v01/.env
+          cp baseline-v01/config/application.example.yaml baseline-v01/config/application.yaml
+          mkdir -p baseline-v01/secrets/certs baseline-v01/secrets/tls
+          : > baseline-v01/secrets/manageengine_token
           docker compose config --quiet
           docker compose --profile setup config --quiet
           docker compose config --format json | python -c '
@@ -48,3 +58,5 @@ jobs:
           assert published[0]["host_ip"] == "127.0.0.1", "unexpected public bind"
           print("PASS: isolated project and default HTTPS binding")
           '
+      - name: Compare actual v0.1 and v0.2 Compose resources (read-only)
+        run: python scripts/check_compose_isolation.py --baseline-dir baseline-v01 --candidate-dir .
