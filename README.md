@@ -102,7 +102,7 @@ python3 -m pytest -q tests
 docker compose config --quiet
 ~~~
 
-GitHub Actions on this development branch additionally tests an ephemeral PostgreSQL 17 database, verifies read-only reporting privileges and compares Compose resources with V1 and V2. **No full production-like Docker/Metabase/Endpoint Central deployment has yet been verified.**
+GitHub Actions on this development branch additionally tests an ephemeral PostgreSQL 17 database, verifies read-only reporting privileges and compares Compose resources with V1 and V2. A **full synthetic Docker/Metabase Demo startup** has passed in GitHub Actions, including HTTPS health, initialized risk reporting views and read-only CLI checks. Real Endpoint Central/Live integrations and corporate production-like behavior have **not** been verified.
 
 The score is **an operational priority metric**, not an exploit probability. An observed version match is **potential exposure**, not proof that a vendor-provided fix is absent. EPSS is a probability estimated by FIRST; the project's composite risk points are not probabilities. cve.now polling is bounded and does not provide complete historical CVE coverage.
 
