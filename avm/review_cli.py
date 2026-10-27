@@ -12,8 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from avm.mapping_review import ReviewError, propose_manual, review_decision
-from avm.models import (MappingDecision, MappingReview, ApprovedSoftwareMapping,
-                        initialize, session_factory)
+from avm.models import MappingDecision, MappingReview, session_factory
 from avm.settings import config
 
 
@@ -55,7 +54,6 @@ def main(argv=None):
     engine = None
     try:
         engine, factory = session_factory()
-        initialize(engine)
         cfg = config()
         with factory() as session:
             if args.command == 'list':
