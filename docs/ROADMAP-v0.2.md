@@ -8,7 +8,7 @@ v0.2 focuses on **reliable inventory and defensible software-to-vulnerability id
 
 ## Milestone 0 — Development isolation and quality gates
 
-- [ ] Support independent Docker Compose project names, networks, volumes and HTTPS ports for simultaneous v0.1/v0.2 testing.
+- [x] Support independent Docker Compose project names, networks, volumes and HTTPS ports for simultaneous v0.1/v0.2 testing (configuration implemented; runtime validation pending).
 - [ ] Document an isolated v0.2 installation; never reuse v0.1 production/demo database volumes.
 - [ ] Add CI checks: Python unit tests, syntax/lint checks, Docker Compose config validation, secret scanning where available.
 - [ ] Test existing standalone Endpoint Central API smoke test against a controlled mock; real integration tests require an approved Endpoint Central instance.
@@ -58,5 +58,5 @@ Asset criticality, EPSS/KEV enrichment, risk prioritization, vulnerability lifec
 ## Current constraints
 
 - Real Endpoint Central responses and CVE provider compatibility are not yet verified.
-- Existing v0.1 Compose project name is fixed; **do not start both branches on the same Docker daemon yet**.
+- v0.1 Compose project name is fixed. v0.2 defaults to a distinct project and port; **runtime coexistence is not yet verified**, so check resolved Compose configuration before starting both.
 - `config/product-mappings.live.yaml` intentionally begins empty to prevent unsupported correlations.
