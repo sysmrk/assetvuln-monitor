@@ -37,6 +37,51 @@ DASHBOARDS = {
         ('Detection Trend', 'line', 'SELECT detected_day, findings_created FROM reporting.detection_timeline ORDER BY detected_day DESC LIMIT 180', 12),
         ('Most Exposed Systems', 'bar', 'SELECT hostname, critical_findings, matched_findings FROM reporting.top_risky_assets ORDER BY critical_findings DESC LIMIT 15', 12),
     ],
+    '07 · Mapping Quality & Review': [
+        ('Active Software Products', 'scalar',
+         'SELECT active_products FROM reporting.data_quality_overview', 6),
+        ('Verified Mapping Coverage %', 'scalar',
+         'SELECT mapping_coverage_pct FROM reporting.data_quality_overview', 6),
+        ('Unmapped Active Products', 'scalar',
+         'SELECT unmapped_products FROM reporting.data_quality_overview', 6),
+        ('Pending Mapping Reviews', 'scalar',
+         'SELECT pending_reviews FROM reporting.data_quality_overview', 6),
+        ('Approved Active Products', 'scalar',
+         'SELECT approved_mapped_products FROM reporting.data_quality_overview', 6),
+        ('Unknown Vendor Products', 'scalar',
+         'SELECT unknown_vendor_products FROM reporting.data_quality_overview', 6),
+        ('Unknown Version Installations', 'scalar',
+         'SELECT unknown_version_installations FROM reporting.data_quality_overview', 6),
+        ('Active Software Installations', 'scalar',
+         'SELECT active_installations FROM reporting.data_quality_overview', 6),
+        ('Verified vs Unmapped Active Products', 'pie',
+         'SELECT mapping_status, count(*) AS product_count '
+         'FROM reporting.data_quality_products GROUP BY mapping_status ORDER BY product_count DESC', 12),
+        ('Unmapped Products by Vendor', 'bar',
+         'SELECT vendor, unmapped_products FROM reporting.data_quality_by_vendor '
+         'ORDER BY unmapped_products DESC, vendor LIMIT 20', 12),
+        ('Mapping Coverage by Operating System', 'table',
+         'SELECT os_name, active_products, mapped_products, unmapped_products '
+         'FROM reporting.data_quality_by_os ORDER BY unmapped_products DESC LIMIT 100', 12),
+        ('Mapping Coverage by Domain', 'table',
+         'SELECT domain, active_products, mapped_products, unmapped_products '
+         'FROM reporting.data_quality_by_domain ORDER BY unmapped_products DESC LIMIT 100', 12),
+        ('Unmapped Product Inventory & Data Gaps', 'table',
+         'SELECT software, vendor, active_asset_count, active_installation_rows, '
+         'unknown_version_installations FROM reporting.data_quality_products '
+         "WHERE mapping_status='unmapped' ORDER BY active_asset_count DESC, software LIMIT 2000", 24),
+        ('Mapping Review Queue', 'table',
+         'SELECT review_id, vendor, software, ecosystem, package_name, similarity, origin, '
+         'proposed_by, created_at FROM reporting.mapping_review_queue '
+         "WHERE status='pending' ORDER BY similarity DESC NULLS LAST, created_at DESC LIMIT 500", 24),
+        ('Mapping Decision Audit', 'table',
+         'SELECT event_id, review_id, action, actor, reason, created_at, vendor, software, '
+         'ecosystem, package_name FROM reporting.mapping_review_audit '
+         'ORDER BY created_at DESC LIMIT 500', 24),
+        ('Source Sync Freshness', 'table',
+         'SELECT source, last_success_at, last_failed_at, successful_runs, failed_runs '
+         'FROM reporting.data_quality_sync_freshness ORDER BY source', 24),
+    ],
     '06 · Pipeline Health & Coverage': [
         ('Mapped Packages', 'scalar', 'SELECT mapped_products FROM reporting.coverage', 6),
         ('Unmapped Packages', 'scalar', 'SELECT unmapped_products FROM reporting.coverage', 6),
