@@ -10,6 +10,7 @@
 | Browser shows certificate warning | Expected for WSL self-signed TLS; install a trusted cert in production |
 | Dashboard initial setup failed | Run `docker compose --profile setup run --rm bootstrap`; inspect `docker compose logs metabase worker` |
 | Postgres connection refused | `docker compose logs postgres`; verify no accidental volume loss |
+| ManageEngine API smoke test FAIL/SKIP | Run `python3 scripts/test_manageengine_api.py`; check HTTPS URL, read-only token, internal CA, HTTP status and JSON response shape. For an empty scan, use `--resource-id ID` to test softwareInfo independently |
 | Inventory empty in live mode | Confirm least-privilege token, DNS, custom CA, version-compatible `/dcapi` endpoints; check worker logs |
 | Many unmapped software entries | Add verified exact software→package mappings; do not treat unmapped as safe |
 | No CVE findings in live mode | Verify current cve.now response schema, affected package/range data and mappings; zero is NOT proof of safety |
