@@ -55,15 +55,15 @@ The script reads only local files and writes the **report** only when `--output`
 
 ## How to review a suggestion
 
-Check the software identity and exact vendor/product against an authoritative source, check whether the proposed package ecosystem really describes that product, and verify whether the advisory's version semantics apply (including vendor patch backports). **Only then** manually add the approved four-field record to your private live mapping file. Human approval is not implemented as a separate workflow yet.
+Check the software identity and exact vendor/product against an authoritative source, check whether the proposed package ecosystem really describes that product, and verify whether the advisory's version semantics apply (including vendor patch backports). **Only then** approve through the privileged database-backed review CLI (or manually add a properly reviewed record to the private Live YAML). The new [Mapping Review workflow](MAPPING-REVIEW.md) persists proposals and decisions; it never auto-promotes similarity suggestions.
 
 ## Limitations and follow-up
 
 - The report operates on a CSV snapshot; the v0.2 runtime worker only adopts **approved exact normalized keys**, not fuzzy suggestions.
-- No built-in vendor synonym catalogue, PURL/CPE resolution, review audit trail or operator UI yet.
+- A database-backed application-level review audit and privileged CLI now exist; **no authenticated reviewer UI, immutable audit storage, vendor synonym catalogue or PURL/CPE resolution yet**.
 - Similar names (e.g. different major product editions) can score highly but still be unrelated.
 - Coverage metrics refer to exact approved identities **within the supplied catalogue**, not to full CVE intelligence coverage.
-- Proposed future work: verified alias catalogue, persisted review queue, review history and Metabase mapping-quality dashboard.
+- The Worker persists candidate reviews and the seventh Metabase dashboard surfaces review state. Future work: verified alias catalogue, approval revocation, SSO/RBAC and higher-scale performance validation.
 
 ## Quality checks
 
