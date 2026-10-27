@@ -413,7 +413,7 @@ VIEWS = {
 'risk_overview': '''
  SELECT count(*) FILTER (WHERE f.active AND a.active) AS active_findings,
         count(*) FILTER (WHERE f.active AND a.active AND f.priority='P1') AS p1_findings,
-        count(*) FILTER (WHERE f.active AND a.active AND v.kev) AS kev_findings,
+        count(*) FILTER (WHERE f.active AND a.active AND v.kev_verified) AS kev_findings,
         coalesce(sum(f.risk_score) FILTER (WHERE f.active AND a.active),0) AS priority_points,
         count(*) FILTER (WHERE f.active AND a.active AND f.workflow_state='accepted'
           AND f.accepted_until > now()) AS accepted_findings,
@@ -430,7 +430,7 @@ VIEWS = {
  SELECT f.id AS finding_id, a.hostname, a.source_id, a.domain, a.os_name,
         a.business_service, a.owner, a.criticality, a.internet_facing,
         s.vendor, s.name AS software, i.version,
-        v.id AS cve_id, v.cvss, v.epss, v.epss_asof, v.kev, v.intel_checked_at,
+        v.id AS cve_id, v.cvss, v.epss, v.epss_asof, v.kev_verified AS kev, v.intel_checked_at,
         f.priority, f.risk_score, f.workflow_state, f.sla_due_at,
         f.first_detected, f.last_detected,
         (f.sla_due_at < now() AND NOT
