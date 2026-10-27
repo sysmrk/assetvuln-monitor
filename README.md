@@ -19,6 +19,19 @@ python3 -m pytest -q
 
 See [software normalization and mapping review](docs/SOFTWARE-NORMALIZATION.md) and [v0.2 roadmap](docs/ROADMAP-v0.2.md). To validate Compose isolation against a v0.1 checkout, run `python3 scripts/check_compose_isolation.py --baseline-dir /path/to/v0.1` before starting both deployments. GitHub Actions runs unit tests and Compose syntax checks on the development branch.
 
+## v0.2 — Audited mapping review and seventh dashboard
+
+The v0.2 worker persists **review-only mapping candidates** after a successful inventory sync. Trusted administrators can propose, approve or reject software identities using the privileged CLI. Manual proposals require a separate reviewer identifier; decisions and reasons are recorded in the database. Only approved identities can affect the next inventory synchronization. No suggestion is automatically approved.
+
+```bash
+# Read-only review queue:
+docker compose exec worker python -m avm.review_cli list --status pending
+# Read-only decision history:
+docker compose exec worker python -m avm.review_cli history --review-id 12
+```
+
+The new **07 · Mapping Quality & Review** Metabase dashboard reports active mapped/unmapped software, pending decisions, unknown vendors/versions, per-OS/domain/vendor quality, audit records and ingest freshness. Mapping identity coverage is distinct from ingested-advisory coverage. For privileged approve/reject commands, security limitations and workflow details, see [Mapping Review](docs/MAPPING-REVIEW.md). Feature requires v0.2's isolated database.
+
 ## Quick start: choose DEMO or LIVE
 
 > **Important:** v0.1 is a technical preview. The demo can be evaluated locally; the live Endpoint Central/cve.now integration has not yet been validated against real vendor responses and is **not production-certified**. The application is read-only toward managed assets in both modes.
@@ -50,7 +63,7 @@ grep '^METABASE_ADMIN_EMAIL=' .env
 grep '^METABASE_ADMIN_PASSWORD=' .env
 ```
 
-Open **https://localhost:8444**. The localhost TLS certificate is self-signed for demo use. Set the Metabase password in `.env` before installing; the installer provisions six dashboards automatically. Demo records are synthetic, clearly labeled `CVE-DEMO-*`, and never fetched from ManageEngine.
+Open **https://localhost:8444**. The localhost TLS certificate is self-signed for demo use. Set the Metabase password in `.env` before installing; the installer provisions seven dashboards automatically. Demo records are synthetic, clearly labeled `CVE-DEMO-*`, and never fetched from ManageEngine.
 
 ### LIVE — real inventory (separate clean deployment)
 
@@ -126,6 +139,7 @@ The test checks the first inventory page and one computer's software page; it do
 | 04 · Vulnerability Intelligence | Advisories, CVSS/EPSS/KEV when present, severity overview |
 | 05 · Affected Assets & Evidence | Individual CVE↔asset↔version matches, source evidence, trend |
 | 06 · Pipeline Health & Coverage | Source collection status and unmapped-package visibility |
+| 07 · Mapping Quality & Review | Coverage, review queue and audit, data-quality gaps and source freshness |
 
 Only `reporting.*` views are exposed to the Metabase reporting user. **Metabase users can browse/report on data but cannot change assets** through this application. Metabase administrators can still edit Metabase's own charts and settings.
 
