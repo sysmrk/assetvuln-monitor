@@ -33,7 +33,7 @@ jobs:
           python -m compileall -q avm scripts tests
           bash -n scripts/install.sh
       - name: Unit tests
-        run: python -m pytest -q
+        run: python -m pytest -q tests
       - name: Resolve v0.2 Compose configuration (no containers started)
         run: |
           cp example.env .env
