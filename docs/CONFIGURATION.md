@@ -23,3 +23,23 @@ When an inventory entry identifies a package with a verified ecosystem (e.g. PyP
 ## Credentials
 
 In production, create a least-privilege Endpoint Central account/token with only the inventory read scope. Store it in `secrets/manageengine_token` (permission `0600`). Never paste passwords into GitHub issues, screenshots or logs.
+
+## Software identity mappings
+
+**Demo** uses `config/product-mappings.yaml`: two deliberately synthetic identities matching `avm/demo.py`. **Live** must use `config/product-mappings.live.yaml` by setting `PRODUCT_MAPPINGS_FILE=./config/product-mappings.live.yaml` in `.env`. This file starts with `products: []` so that real assets are inventoried but not assigned unverified CVE findings.
+
+Each mapping has four fields: `vendor` and `name` (exact, case-insensitive match against ManageEngine software inventory), and `ecosystem` and `package` (verified identity in the structured CVE advisory). Example **format only**:
+
+```yaml
+products:
+  - vendor: "Verified Vendor From Inventory"
+    name: "Verified Product From Inventory"
+    ecosystem: "PyPI"
+    package: "verified-package-from-advisory"
+```
+
+Do not map unrelated products based on name similarity. A missing mapping does not hide the software from inventory; it prevents unsupported version-based CVE correlation. Vendor patches and backports still require manual verification.
+
+## Independent ManageEngine API test
+
+Before `./install.sh --live`, run `python3 scripts/test_manageengine_api.py` after configuring the HTTPS URL and read-only token. It lists both GET endpoints and checks their initial JSON responses, with PASS/FAIL/SKIP results. Options include `--resource-id 12345` and `--ca-bundle secrets/certs/org-ca.pem`. No Docker or database required; no secrets printed. This is a smoke test, not exhaustive API compatibility validation.
