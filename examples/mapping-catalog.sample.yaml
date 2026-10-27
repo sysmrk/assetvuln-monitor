@@ -1,0 +1,6 @@
+# Synthetic identifiers for offline demonstration; NOT actual CVE identities.
+products:
+  - vendor: "Acme Example Ltd"
+    name: "Acme Secure Client"
+    ecosystem: "PyPI"
+    package: "example-acme-client"
