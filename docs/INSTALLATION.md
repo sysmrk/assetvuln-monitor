@@ -72,7 +72,7 @@ grep '^METABASE_ADMIN_EMAIL=' .env
 grep '^METABASE_ADMIN_PASSWORD=' .env
 ```
 
-Open **https://localhost:8444** on the WSL host browser. The automatically generated localhost certificate is self-signed, so a browser warning is expected in the demo. The six dashboards are automatically provisioned by the bootstrap container. Synthetic advisories are labeled `CVE-DEMO-*` and are not real CVEs.
+Open **https://localhost:8444** on the WSL host browser. The automatically generated localhost certificate is self-signed, so a browser warning is expected in the demo. The seven dashboards are automatically provisioned by the bootstrap container. Synthetic advisories are labeled `CVE-DEMO-*` and are not real CVEs.
 
 Useful operational commands:
 
@@ -225,6 +225,19 @@ The script lists the two GET endpoints at startup, validates JSON list shapes, p
 
 Once an inventory CSV export is available, run `python3 scripts/suggest_mappings.py --inventory-csv /secure/path/software.csv --approved-mappings config/product-mappings.live.yaml --output mapping-review.json` to generate **review-only** candidate suggestions and mapping coverage counts. This does not contact ManageEngine or modify approved mappings. See [Software normalization](SOFTWARE-NORMALIZATION.md). To check v0.1/v0.2 Compose isolation, run `python3 scripts/check_compose_isolation.py --baseline-dir /path/to/v01 --candidate-dir .`.
 
+## v0.2 review workflow and Data Quality dashboard
+
+After the v0.2 Worker initializes the database, the seventh Metabase dashboard **07 · Mapping Quality & Review** is provisioned by bootstrap. It shows Mapping coverage, known data gaps, audit history and pending human review. The default Live mapping file remains empty until identities are verified.
+
+```bash
+# Read-only pending proposals:
+docker compose exec worker python -m avm.review_cli list --status pending
+# Read-only history (replace 12 with an actual review ID):
+docker compose exec worker python -m avm.review_cli history --review-id 12
+```
+
+Manual proposal/approve/reject operations require a privileged operator with direct access to the Worker container and database. They **write only to application mapping-review tables**, never to Endpoint Central. Verify package identities, require a distinct reviewer for manual proposals, and inspect the result at the **next successful inventory sync**. See [complete mapping-review workflow](MAPPING-REVIEW.md) for exact commands, limitations and security boundaries. Do not expose the privileged CLI as a public HTTP endpoint.
+
 ## 4. Verification and limitations
 
 ```bash
@@ -233,7 +246,7 @@ docker compose logs --tail=150 worker
 docker compose logs --tail=150 metabase
 ```
 
-Demo success criteria: 10 synthetic assets, six dashboards, software installations and labeled `CVE-DEMO-*` records, without duplicate dashboards after a second install. Live success criteria: valid read-only API access, realistic inventory counts, verified pagination and software versions, successful advisory collection, and reviewed correlation evidence. A green container alone does **not** prove source compatibility.
+Demo success criteria: 10 synthetic assets, seven dashboards, software installations and labeled `CVE-DEMO-*` records, without duplicate dashboards after a second install. Live success criteria: valid read-only API access, realistic inventory counts, verified pagination and software versions, successful advisory collection, and reviewed correlation evidence. A green container alone does **not** prove source compatibility.
 
 **Current limitations:** on-premises Endpoint Central only (cloud API not implemented), limited cve.now recent polling (no complete historical backfill), conservative package identity matching, and no generic CPE/backport verification. Neither mode modifies any managed asset.
 
