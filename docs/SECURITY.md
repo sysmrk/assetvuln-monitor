@@ -1,37 +1,53 @@
-# Security model and non-goals
+# V3 security model, trust boundaries and outstanding controls
 
-**Design invariant:** Neither AssetVuln Monitor nor the account used for collection may change any managed Endpoint Central asset. The external ManageEngine and cve.now clients deliberately expose *only* a `.get()` method and reject cleartext HTTP.
+## Non-negotiable invariant
 
-## Trust boundaries
+AssetVuln Monitor is **read-only toward managed Endpoint Central assets**. External inventory, CVE and public threat-intelligence clients support GET-only operations. No patch deployment, SSH execution, configuration changes, vulnerability exploitation, or remote endpoint actions are implemented. Metabase bootstrap can issue authenticated POST/PUT requests **only to the local Metabase service** to create dashboard configuration; this is not an Endpoint Central action.
 
-- ManageEngine token exists as a private host file and is mounted read-only into the worker, not Metabase/NGINX/PostgreSQL.
-- Only NGINX publishes an HTTPS port, bound to `127.0.0.1` by default. NGINX is attached to the non-internal `ingress` bridge for Docker port publishing and to the internal `frontend` network for Metabase proxying; Metabase is not attached to `ingress`.
-- PostgreSQL is internal-only; no host port binding.
-- The Metabase connection to the application database uses `avm_reader` with SELECT on reporting views only.
-- Dashboard content is hidden behind Metabase login; no anonymous/public links are provisioned.
-- Python worker runs as the host installer’s unprivileged UID/GID (recorded in `.env`), enabling access to the owner-only 0600 token without opening world-read permissions. Its filesystem is read-only with `no-new-privileges`.
-- Demo advisories use conspicuously fake CVE identifiers and are never emailed.
-- Upstream timeouts and collection errors preserve the existing inventory, rather than deleting assets due to partial reads.
+## Separation and secrets
 
-## Residual risks and hardening TODOs
+- V3 defaults to a different Compose project (assetvuln-monitor-v03) and port (8445) from V1/V2. The installer rejects the two legacy project names and checks the effective Compose name.
+- Initial Demo .env is generated locally with distinct random passwords and file mode 0600. Existing custom credentials are retained.
+- Credentials and asset context are never committed to Git. The installation is bound to the selected Demo or Live data mode using a local marker.
+- Endpoint Central token is in a private, read-only file mounted into the Worker, not exposed to NGINX or Metabase.
+- Worker uses a non-root host UID/GID, no-new-privileges, and a read-only root filesystem. PostgreSQL is on an internal network, with no host port.
+- NGINX is the only published network-facing service (loopback HTTPS by default), with TLS v1.2/v1.3 support.
+- Metabase's application-data role (avm_reader) has SELECT on approved reporting views. It does not own or have write permissions on raw inventory, finding, audit or approval tables.
+- Docker administrators and anyone able to execute arbitrary commands inside Worker are highly privileged and may access credentials/application DB; restrict access and log host administration.
 
-- Copy `example.env` to `.env` before installation, replace all placeholder credentials, and never commit the populated file. The installer does not overwrite existing `.env` values.
-- Docker Compose `.env` passwords are visible to local Docker administrators. Docker administration is privileged; restrict host access.
-- The Metabase image's own system permissions and JVM memory are controlled by upstream. Verify the pinned image digest, dependencies, and CVEs before production rollout.
-- HTTPS from NGINX terminates at the proxy; private Docker-network service traffic is HTTP by default. Do not place untrusted containers on these networks.
-- Local certificate is self-signed; replace with a trusted certificate on production instances.
-- Metabase's internal users can modify saved charts when their Metabase role allows it, but they cannot modify Endpoint Central assets through this project.
-- Change and audit handling for real vulnerability confirmations require additional workflow support; version matches should be reviewed by security staff.
-- Build and upgrade require image supply-chain verification. Test all operational changes in staging, including vendor API compatibility.
+## Evidence and false-positive controls
 
-## Mapping review trust boundary (v0.2)
+- Only operator-approved exact package identities may yield findings, and only when machine-readable affected-version evidence matches the installed version. A fuzzy identity suggestion never triggers findings.
+- Findings are **potential exposure**, not proof of actual vulnerable installation or exploitable service. Vendor backports, patched distribution packages and deployment configuration must be considered.
+- Evidence snapshots include raw software identity, observed version, approved package and structured ranges. Candidate fixed versions are derived only from explicit machine-readable fixed events; never automatically applied.
+- Missing or partial source inventory cannot legitimately prove that a vulnerability is resolved. V3 distinguishes **not_observed** from confirmed remediation and records reappearance events.
+- EPSS is a provider-supplied statistical probability estimate; AVM's weighted priority points are **not** a probability, a certified risk assessment or a warranty of attack prevention. Unavailable source signals are explicitly flagged as missing.
 
-- The new reviewer CLI runs only inside the privileged Worker execution context and writes local application PostgreSQL review records; it never sends mutation requests to Endpoint Central.
-- Suggestions are **not trusted mappings**. Approval inserts a separate unique approved identity, used at the next inventory sync. Rejected candidates cannot be automatically reopened.
-- `avm_reader` receives SELECT on approved `reporting.*` views only, including review queue/audit, and has **no write permission** on mapping tables. Restrict report access because software inventories and reviewer identifiers are sensitive.
-- Manual proposals enforce a distinct proposer/reviewer **identifier**, not real cryptographic authentication. Someone with Worker shell or application database credentials could impersonate identities or modify application-level audit records. SSO/RBAC, WORM logging and external audit forwarding are still required for enterprise readiness.
-- Any update to a reviewed identity or approved mapping should go through future controlled revocation/change-management features, never ad hoc database edits.
+## Public sources and failure behavior
 
-## Continuous validation boundaries (v0.2)
+- The Live Worker checks CISA KEV and FIRST EPSS once per day (configurable). All requests are fixed-origin HTTPS GET, with redirects refused and bounded FIRST CVE lookup batches.
+- An invalid/incomplete CISA feed or failed FIRST EPSS request prevents updating that intelligence cycle and preserves the last good signals. The next attempt occurs on a limited retry schedule.
+- Demo never contacts real Endpoint Central, CISA or FIRST. Synthetic CVEs are identified as CVE-DEMO-*.
+- The cve.now feed reader is limited to a configurable recent-page window, **not historical completeness**. An absent CVE match cannot establish absence of risk.
+- Source changes and internal CA problems need staging verification. Do not disable TLS validation to work around source errors.
 
-The development branch includes a GitHub Actions job using an ephemeral PostgreSQL 17 service with **synthetic test credentials**. It exercises new review schema, read-only views, and actual `avm_reader` privileges. These are not production credentials. This does not validate real Endpoint Central calls, SSO actor identity, image digests, PostgreSQL concurrency under load, or Metabase administrative controls. Check GitHub Actions results and complete runtime tests before production use.
+## Approvals and state changes
+
+- Mapping proposal review requires privileged access to the application's database through the Worker CLI. A separate manually entered reviewer identifier is required for manual proposals.
+- Risk acceptance is explicitly requested by a privileged operator, has a maximum 180-day duration and records actor/reason/timestamps.
+- Reviewer/actor fields are **self-declared identifiers**. There is currently NO cryptographic identity verification, SSO, strong RBAC or independently immutable audit storage. Two-person checks are administrative workflow guidance, not a security boundary.
+- Mapping and FindingEvent history is application-level append-only under normal code paths, but a database owner can still mutate it. For regulated workflows, add an external tamper-evident audit target and authorized reviewers.
+- No public web endpoint permits mutation of mapping approvals or Finding workflow.
+
+## Risks to address before production use
+
+1. Validate Endpoint Central on-premises API schemas, pagination, rate limits, CA chain and read-only privileges against the actual deployed version.
+2. Validate the structured CVE provider and upstream KEV/EPSS feeds end to end, including timeouts, response-size limits and source freshness.
+3. Use real TLS certificates, review reverse-proxy headers and restrict exposure beyond localhost.
+4. Add integrated SSO/RBAC and policy-bound risk acceptance; current operator CLI relies on shell/database access.
+5. Verify immutable audit forwarding, patch/version corroboration, product identity and vendor backport handling before relying on findings.
+6. Test PostgreSQL schema upgrades, backup/restore, concurrency and Metabase dashboard provisioning in staging. GitHub Actions only covers unit tests, temporary PostgreSQL and static Compose configuration.
+7. Control inventory and report sensitivity; Metabase viewers may see hostnames, installed software, owners and proposed vulnerabilities.
+8. Verify pinned container image digests, supply-chain integrity and current CVEs of the runtime itself.
+
+See [one-command installation](INSTALLATION.md), [V3 operations](V03-OPERATIONS.md) and [mapping governance](MAPPING-REVIEW.md).
