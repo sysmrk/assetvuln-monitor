@@ -27,7 +27,7 @@ v0.2 focuses on **reliable inventory and defensible software-to-vulnerability id
 
 ## Milestone 2 — Software normalization and controlled mapping
 
-- [x] Implement standalone conservative Unicode/whitespace identity normalization and preserve raw inputs (offline prototype; runtime integration pending).
+- [x] Implement conservative Unicode/whitespace identity normalization and preserve raw inputs; integrate approved-only exact normalized keys into the v0.2 worker.
 - [x] Model review-only candidate package identities from existing approved catalogue in an offline report; **no persisted review store or PURL/CPE engine yet**.
 - [x] Add explainable string similarity and source/evidence labels; explicitly **not** a probability/confidence of product identity and never auto-promote.
 - [ ] Provide analyst approval/rejection and audit trail; begin with CLI or a simple review interface.
@@ -64,6 +64,6 @@ Asset criticality, EPSS/KEV enrichment, risk prioritization, vulnerability lifec
 
 ## Current constraints
 
-- Real Endpoint Central responses and CVE provider compatibility are not yet verified.
+- Real Endpoint Central responses and CVE provider compatibility are not yet verified. Runtime worker mapping changes are covered by code-level tests but not Docker/live validation.
 - v0.1 Compose project name is fixed. v0.2 defaults to a distinct project and port; **runtime coexistence is not yet verified**, so check resolved Compose configuration before starting both.
 - `config/product-mappings.live.yaml` intentionally begins empty to prevent unsupported correlations.
