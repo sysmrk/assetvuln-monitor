@@ -102,6 +102,14 @@ def evidence_packet(*, asset, software, installation, vulnerability,
         'vulnerability_id': vulnerability.id,
         'source': 'cve.now-structured-affected',
         'matching': 'approved-package-identity-and-osv-range',
+        'threat_intelligence': {
+            'cisa_kev_verified': bool(getattr(vulnerability, 'kev_verified', False)),
+            'epss_officially_retrieved': getattr(vulnerability, 'epss_asof', None) is not None,
+            'epss_retrieved_at': (
+                vulnerability.epss_asof.isoformat()
+                if getattr(vulnerability, 'epss_asof', None) is not None else None),
+            'synthetic_demo': bool(getattr(vulnerability, 'synthetic', False)),
+        },
         'affected_ranges': affected_specs[:12],
         'candidate_fixed_versions': versions,
         'limitations': [
