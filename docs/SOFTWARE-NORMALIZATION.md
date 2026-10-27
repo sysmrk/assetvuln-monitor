@@ -1,6 +1,6 @@
 # Software normalization and mapping review — v0.2 (initial implementation)
 
-This is an **offline prototype**, not a production automated mapping service. It cannot read the Endpoint Central database or GitHub's CVE feed directly. It does not create findings, approve software identities, or modify the application's live mapping file.
+The **candidate generation and review report are offline prototypes**, not a production automated mapping service. The CSV tool does not contact Endpoint Central or the CVE feed, approve software identities, or modify live mappings. The v0.2 worker now also uses the same conservative normalized exact-key rules for *explicitly approved* mappings; it never consumes suggested candidates.
 
 ## Motivation
 
@@ -59,7 +59,7 @@ Check the software identity and exact vendor/product against an authoritative so
 
 ## Limitations and follow-up
 
-- The report operates on a CSV snapshot; the existing runtime worker remains unchanged.
+- The report operates on a CSV snapshot; the v0.2 runtime worker only adopts **approved exact normalized keys**, not fuzzy suggestions.
 - No built-in vendor synonym catalogue, PURL/CPE resolution, review audit trail or operator UI yet.
 - Similar names (e.g. different major product editions) can score highly but still be unrelated.
 - Coverage metrics refer to exact approved identities **within the supplied catalogue**, not to full CVE intelligence coverage.
