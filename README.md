@@ -25,6 +25,8 @@ docker info --format '{{.ServerVersion}}'
 cd /opt/src
 git clone https://github.com/sysmrk/assetvuln-monitor.git
 cd assetvuln-monitor
+cp example.env .env
+nano .env  # replace ALL CHANGE_ME_* passwords before installing
 ./install.sh --demo
 
 # Check status and inspect logs:
@@ -35,7 +37,7 @@ grep '^METABASE_ADMIN_EMAIL=' .env
 grep '^METABASE_ADMIN_PASSWORD=' .env
 ```
 
-Open **https://localhost:8443**. The localhost TLS certificate is self-signed for demo use. The installer generates the Metabase password in `.env` and provisions six dashboards automatically. Demo records are synthetic, clearly labeled `CVE-DEMO-*`, and never fetched from ManageEngine.
+Open **https://localhost:8443**. The localhost TLS certificate is self-signed for demo use. Set the Metabase password in `.env` before installing and provisions six dashboards automatically. Demo records are synthetic, clearly labeled `CVE-DEMO-*`, and never fetched from ManageEngine.
 
 ### LIVE — real inventory (separate clean deployment)
 
@@ -46,6 +48,8 @@ Open **https://localhost:8443**. The localhost TLS certificate is self-signed fo
 cd /opt
 git clone https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-live
 cd assetvuln-monitor-live
+cp example.env .env
+nano .env  # replace all CHANGE_ME_* values, set PUBLIC_URL and bind settings
 cp config/application.example.yaml config/application.yaml
 nano config/application.yaml
 mkdir -p secrets/certs secrets/tls
@@ -76,7 +80,7 @@ docker compose logs --tail=200 worker
 
 Put **only the least-privilege, read-only inventory API token** in `secrets/manageengine_token` — not in YAML or Git. If using an internal CA, copy its PEM into `secrets/certs/org-ca.pem` and set the container CA path above. Use `config/product-mappings.yaml` only for verified software identities.
 
-The installer generates a private `.env` containing `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD`, database passwords, `BIND_IP`, `HTTPS_PORT`, and `PUBLIC_URL`. Review these before exposing a live installation; replace demo TLS certificates with trusted ones. **Never commit `.env`, tokens or private keys.**
+Copy `example.env` to a private `.env` before installation. It contains `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD`, database passwords, `BIND_IP`, `HTTPS_PORT`, and `PUBLIC_URL`. Set these before the first installation; replace demo TLS certificates with trusted ones. **Never commit `.env`, tokens or private keys.**
 
 For **every command**, all optional fields, HTTPS configuration, backup/restore, and troubleshooting, read the [complete step-by-step installation guide](docs/INSTALLATION.md) and [configuration reference](docs/CONFIGURATION.md).
 

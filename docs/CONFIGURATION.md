@@ -1,6 +1,6 @@
 # Configuration reference
 
-`config/application.yaml` is the only ordinary runtime configuration file. It is created from the heavily commented `config/application.example.yaml` during install.
+Runtime configuration uses **both** `.env` (Compose credentials, bind settings and build index) and `config/application.yaml` (application behavior). It is created from the heavily commented `config/application.example.yaml` during install.
 
 - `application.mode`: `demo` or `live`; use `demo` in WSL without ManageEngine.
 - `manageengine.url`: HTTPS base URL (example `https://ec.example.org:8383`). Do **not** add an `/api` suffix.
@@ -14,7 +14,7 @@
 - `matching.mappings_file`: explicit package identity mapping file mounted into the worker.
 - `notifications.email_enabled`: default `false` (never sends in demo mode). SMTP only supports STARTTLS; add SMTP_USER and SMTP_PASSWORD environment variables for optional authentication.
 
-`.env` is generated automatically, mode `0600`, and intentionally not committed. It holds the PostgreSQL / Metabase passwords and localhost bind settings. For multiuser deployments, replace `PUBLIC_URL`, `BIND_IP`, and `HTTPS_PORT`, install proper TLS files in `secrets/tls`, then rerun.
+Before installing, run `cp example.env .env` and edit `.env`: replace all `CHANGE_ME_*` placeholders with unique strong secrets, set `HOST_UID`/`HOST_GID` from `id -u` / `id -g`, and adjust `PUBLIC_URL`, `BIND_IP`, `HTTPS_PORT` as needed. Installer requires `.env`, protects it with mode `0600`, and never overwrites it. `PIP_INDEX_URL` optionally selects the Python package index used during Docker image builds; use a trusted index. `.env` is intentionally excluded from Git. Install proper TLS files in `secrets/tls` before a network-facing deployment.
 
 ## Version mapping
 
