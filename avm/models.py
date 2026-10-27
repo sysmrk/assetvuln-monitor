@@ -23,6 +23,11 @@ class Asset(Base):
     os_version = Column(String(120))
     domain = Column(String(200))
     agent_status = Column(String(100))
+    # Explicit (not guessed) organizational context.
+    criticality = Column(String(12), nullable=False, default='unknown')
+    internet_facing = Column(Boolean, nullable=True)
+    business_service = Column(String(200), nullable=False, default='')
+    owner = Column(String(200), nullable=False, default='')
     last_seen = Column(DateTime(timezone=True), nullable=False, default=now)
     active = Column(Boolean, default=True, nullable=False)
 
@@ -58,6 +63,9 @@ class Vulnerability(Base):
     cvss = Column(Numeric(4, 1))
     epss = Column(Numeric(8, 6))
     kev = Column(Boolean, nullable=False, default=False)
+    epss_asof = Column(DateTime(timezone=True))
+    kev_action = Column(Text)
+    intel_checked_at = Column(DateTime(timezone=True))
     published_at = Column(DateTime(timezone=True))
     modified_at = Column(DateTime(timezone=True))
     retrieved_at = Column(DateTime(timezone=True), default=now, nullable=False)
@@ -85,6 +93,18 @@ class Finding(Base):
     last_detected = Column(DateTime(timezone=True), nullable=False, default=now)
     active = Column(Boolean, nullable=False, default=True)
     alerted_at = Column(DateTime(timezone=True))
+    # v0.3: ranking and evidence are explainable snapshots, not confirmed CVEs.
+    risk_score = Column(Numeric(5, 2))
+    priority = Column(String(3))
+    risk_factors = Column(JSON)
+    evidence_packet = Column(JSON)
+    remediation = Column(JSON)
+    workflow_state = Column(String(24), nullable=False, default='open')
+    state_updated_at = Column(DateTime(timezone=True))
+    accepted_until = Column(DateTime(timezone=True))
+    accepted_by = Column(String(120))
+    acceptance_reason = Column(Text)
+    sla_due_at = Column(DateTime(timezone=True))
     __table_args__ = (UniqueConstraint('installation_id', 'vulnerability_id', name='uq_finding'),)
 
 
@@ -159,6 +179,58 @@ class ApprovedSoftwareMapping(Base):
     approved_at = Column(DateTime(timezone=True), nullable=False, default=now)
     __table_args__ = (UniqueConstraint('normalized_vendor', 'normalized_name',
                                        name='uq_approved_software_identity'),)
+
+
+
+
+class FindingEvent(Base):
+    __tablename__ = 'finding_events'
+    id = Column(Integer, primary_key=True)
+    finding_id = Column(Integer, ForeignKey('findings.id'), nullable=False, index=True)
+    action = Column(String(30), nullable=False)
+    actor = Column(String(120), nullable=False)
+    reason = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=now)
+
+
+class RiskSnapshot(Base):
+    __tablename__ = 'risk_snapshots'
+    id = Column(Integer, primary_key=True)
+    day = Column(String(10), nullable=False, unique=True)
+    active_findings = Column(Integer, nullable=False)
+    priority_points = Column(Numeric(14, 2), nullable=False)
+    p1_findings = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=now)
+
+
+# Idempotent, additive, PostgreSQL-only in-place upgrade for existing v0.2 databases.
+# No dropping/re-writing or production data copies; SQLite unit tests use fresh schema.
+V3_ADDITIVE_COLUMNS = {
+    'assets': (
+        "criticality varchar(12) NOT NULL DEFAULT 'unknown'",
+        'internet_facing boolean',
+        "business_service varchar(200) NOT NULL DEFAULT ''",
+        "owner varchar(200) NOT NULL DEFAULT ''",
+    ),
+    'vulnerabilities': ('epss_asof timestamptz', 'kev_action text',
+                        'intel_checked_at timestamptz'),
+    'findings': ('risk_score numeric(5,2)', 'priority varchar(3)',
+                 'risk_factors json', 'evidence_packet json', 'remediation json',
+                 "workflow_state varchar(24) NOT NULL DEFAULT 'open'",
+                 'state_updated_at timestamptz', 'accepted_until timestamptz',
+                 'accepted_by varchar(120)', 'acceptance_reason text',
+                 'sla_due_at timestamptz'),
+}
+
+
+def upgrade_v03(engine):
+    if engine.dialect.name != 'postgresql':
+        return
+    with engine.begin() as conn:
+        for table, columns in V3_ADDITIVE_COLUMNS.items():
+            for definition in columns:
+                # Table names/SQL definitions are static trusted literals above.
+                conn.execute(text(f'ALTER TABLE public.{table} ADD COLUMN IF NOT EXISTS {definition}'))
 
 
 def session_factory():
@@ -336,12 +408,95 @@ VIEWS = {
         count(*) FILTER (WHERE success = false) AS failed_runs
  FROM sync_runs GROUP BY source
 '''
+,
+'risk_overview': '''
+ SELECT count(*) FILTER (WHERE f.active AND a.active) AS active_findings,
+        count(*) FILTER (WHERE f.active AND a.active AND f.priority='P1') AS p1_findings,
+        count(*) FILTER (WHERE f.active AND a.active AND v.kev) AS kev_findings,
+        coalesce(sum(f.risk_score) FILTER (WHERE f.active AND a.active),0) AS priority_points,
+        count(*) FILTER (WHERE f.active AND a.active AND f.workflow_state='accepted'
+          AND f.accepted_until > now()) AS accepted_findings,
+        count(*) FILTER (WHERE f.active AND a.active AND f.sla_due_at < now()
+          AND NOT (f.workflow_state='accepted' AND f.accepted_until > now()))
+          AS overdue_findings,
+        count(*) FILTER (WHERE f.active AND a.active AND f.risk_score IS NULL)
+          AS unscored_findings
+ FROM findings f JOIN installations i ON i.id=f.installation_id
+ JOIN assets a ON a.id=i.asset_id
+ JOIN vulnerabilities v ON v.id=f.vulnerability_id
+''',
+'risk_queue': '''
+ SELECT f.id AS finding_id, a.hostname, a.source_id, a.domain, a.os_name,
+        a.business_service, a.owner, a.criticality, a.internet_facing,
+        s.vendor, s.name AS software, i.version,
+        v.id AS cve_id, v.cvss, v.epss, v.epss_asof, v.kev, v.intel_checked_at,
+        f.priority, f.risk_score, f.workflow_state, f.sla_due_at,
+        f.first_detected, f.last_detected,
+        (f.sla_due_at < now() AND NOT
+          (f.workflow_state='accepted' AND f.accepted_until > now())) AS overdue,
+        (f.workflow_state='accepted' AND f.accepted_until > now()) AS risk_accepted
+ FROM findings f JOIN installations i ON i.id=f.installation_id
+ JOIN assets a ON a.id=i.asset_id
+ JOIN software s ON s.id=i.software_id
+ JOIN vulnerabilities v ON v.id=f.vulnerability_id
+ WHERE f.active AND i.active AND a.active
+''',
+'finding_evidence': '''
+ SELECT f.id AS finding_id, v.id AS cve_id, a.hostname, s.vendor,
+        s.name AS software, i.version, f.priority, f.risk_score,
+        f.risk_factors, f.evidence_packet, f.remediation,
+        f.confidence, f.workflow_state, f.last_detected
+ FROM findings f JOIN installations i ON i.id=f.installation_id
+ JOIN assets a ON a.id=i.asset_id
+ JOIN software s ON s.id=i.software_id
+ JOIN vulnerabilities v ON v.id=f.vulnerability_id
+ WHERE f.active AND i.active AND a.active
+''',
+'finding_lifecycle': '''
+ SELECT f.id AS finding_id, v.id AS cve_id, a.hostname, a.owner,
+        f.active AS observed_in_last_complete_inventory,
+        f.workflow_state, f.accepted_by, f.accepted_until,
+        f.acceptance_reason, f.first_detected, f.last_detected,
+        f.state_updated_at, f.sla_due_at, f.priority
+ FROM findings f JOIN installations i ON i.id=f.installation_id
+ JOIN assets a ON a.id=i.asset_id
+ JOIN vulnerabilities v ON v.id=f.vulnerability_id
+''',
+'finding_event_history': '''
+ SELECT e.id AS event_id, e.finding_id, e.action, e.actor, e.reason,
+        e.created_at
+ FROM finding_events e
+''',
+'risk_trend': '''
+ SELECT day, active_findings, priority_points, p1_findings, created_at
+ FROM risk_snapshots
+''',
+'risk_by_service': '''
+ SELECT coalesce(nullif(btrim(business_service),''),'Unassigned') AS business_service,
+        count(*) AS active_findings,
+        coalesce(sum(risk_score),0) AS modeled_priority_points
+ FROM reporting.risk_queue GROUP BY 1
+''',
+'risk_by_owner': '''
+ SELECT coalesce(nullif(btrim(owner),''),'Unassigned') AS owner,
+        count(*) AS active_findings,
+        coalesce(sum(risk_score),0) AS modeled_priority_points
+ FROM reporting.risk_queue GROUP BY 1
+''',
+'asset_context_quality': '''
+ SELECT count(*) FILTER (WHERE active) AS active_assets,
+        count(*) FILTER (WHERE active AND criticality='unknown') AS unknown_criticality,
+        count(*) FILTER (WHERE active AND internet_facing IS NULL) AS unknown_exposure,
+        count(*) FILTER (WHERE active AND owner='') AS unassigned_owner
+ FROM assets
+'''
 
 }
 
 
 def initialize(engine):
     Base.metadata.create_all(engine)
+    upgrade_v03(engine)
     with engine.begin() as conn:
         conn.execute(text('CREATE SCHEMA IF NOT EXISTS reporting'))
         for name, query in VIEWS.items():
