@@ -16,6 +16,7 @@ from avm.collectors import ManageEngineCollector, CveNowCollector
 from avm.demo import inventory as demo_inventory, vulnerabilities as demo_vulnerabilities
 from avm.matching import extract_affected, is_affected
 from avm.normalization import normalized_label, runtime_lookup
+from avm.mapping_review import approved_runtime_lookup, refresh_review_queue
 
 logging.basicConfig(level=os.environ.get('LOG_LEVEL','INFO'),
                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
@@ -31,12 +32,18 @@ def timestamp(s):
         return None
 
 
-def mappings(cfg):
+def mapping_rows(cfg):
     data = yaml.safe_load(Path(cfg['matching']['mappings_file']).read_text()) or {}
-    if not isinstance(data, dict):
-        raise ValueError('Software mappings YAML must be an object')
-    # Only explicit approved identities are loaded. Fuzzy suggestions are never used.
-    return runtime_lookup(data.get('products', []))
+    if not isinstance(data, dict) or not isinstance(data.get('products'), list):
+        raise ValueError('Software mappings must contain a products list')
+    return data['products']
+
+
+def mappings(cfg, session=None):
+    # Existing callers/tests can read YAML alone. Runtime merges *approved*
+    # database identities; proposals never influence CVE matching.
+    rows = mapping_rows(cfg)
+    return runtime_lookup(rows) if session is None else approved_runtime_lookup(session, rows)
 
 
 def upsert_inventory(session, records, lookup):
@@ -230,9 +237,18 @@ def main():
         with factory() as session:
             if not last_inventory or current - last_inventory >= int(cfg['manageengine']['sync_minutes'])*60:
                 try:
-                    lookup = mappings(cfg)
+                    operator_rows = mapping_rows(cfg)
+                    lookup = approved_runtime_lookup(session, operator_rows)
                     incoming = demo_inventory() if mode == 'demo' else ManageEngineCollector(cfg['manageengine']).collect()
-                    count = record_run(session, 'inventory', lambda: upsert_inventory(session, incoming, lookup))
+
+                    def write_inventory_and_reviews():
+                        count = upsert_inventory(session, incoming, lookup)
+                        # Same transaction: failed/partial inventory never seeds reviews.
+                        created = refresh_review_queue(session, operator_rows)
+                        log.info('Mapping proposals queued for human review: %s', created)
+                        return count
+
+                    count = record_run(session, 'inventory', write_inventory_and_reviews)
                     log.info('Inventory synchronized: %s assets', count)
                     run_match = True
                     last_inventory = current
