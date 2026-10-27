@@ -82,6 +82,7 @@ def enrich_vulnerabilities(session, *, kev_catalog, epss_values):
             continue
         action = kev_catalog.get(item.id.upper())
         item.kev = action is not None
+        item.kev_verified = action is not None
         item.kev_action = action if action else None
         if item.id in epss_values:
             value = float(epss_values[item.id])
