@@ -1,6 +1,6 @@
-# v0.2 — Isolated installation alongside v0.1
+# v0.2 — Historical isolation guide (V2)
 
-This guide applies **only** to the `develop/v0.2` branch. v0.1 remains on `main`.
+This historical guide applies to develop/v0.2. For **V3**, use [V3 installation](INSTALLATION.md) and the default new project name assetvuln-monitor-v03, HTTPS 8445. The v0.1 baseline remains on main.
 
 ## Isolation design
 
