@@ -1,6 +1,6 @@
-# Software normalization and mapping review — v0.2 (initial implementation)
+# Software normalization and reviewed mapping — V2 foundation, retained in V3
 
-The **candidate generation and review report are offline prototypes**, not a production automated mapping service. The CSV tool does not contact Endpoint Central or the CVE feed, approve software identities, or modify live mappings. The v0.2 worker now also uses the same conservative normalized exact-key rules for *explicitly approved* mappings; it never consumes suggested candidates.
+The **candidate generation and review report are offline prototypes**, not a production automated mapping service. The CSV tool does not contact Endpoint Central or the CVE feed, approve software identities, or modify live mappings. The V2/V3 worker uses the same conservative normalized exact-key rules for *explicitly approved* mappings; it never consumes suggested candidates.
 
 ## Motivation
 
@@ -60,7 +60,7 @@ Check the software identity and exact vendor/product against an authoritative so
 ## Limitations and follow-up
 
 - The report operates on a CSV snapshot; the v0.2 runtime worker only adopts **approved exact normalized keys**, not fuzzy suggestions.
-- A database-backed application-level review audit and privileged CLI now exist; **no authenticated reviewer UI, immutable audit storage, vendor synonym catalogue or PURL/CPE resolution yet**.
+- A database-backed application-level review audit and privileged CLI are included in V2/V3; **no authenticated reviewer UI, immutable audit storage, vendor synonym catalogue or PURL/CPE resolution yet**.
 - Similar names (e.g. different major product editions) can score highly but still be unrelated.
 - Coverage metrics refer to exact approved identities **within the supplied catalogue**, not to full CVE intelligence coverage.
 - The Worker persists candidate reviews and the seventh Metabase dashboard surfaces review state. Future work: verified alias catalogue, approval revocation, SSO/RBAC and higher-scale performance validation.
