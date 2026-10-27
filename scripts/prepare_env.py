@@ -38,9 +38,9 @@ def prepare(root, mode):
         if name in PASSWORDS and (not old or old.startswith('CHANGE_ME_')):
             value = secrets.token_urlsafe(36)
         elif name == 'HOST_UID' and old == '1000':
-            value = str(os.getuid())
+            value = str(os.getuid() or 10001)
         elif name == 'HOST_GID' and old == '1000':
-            value = str(os.getgid())
+            value = str(os.getgid() or 10001)
         elif name == 'PRODUCT_MAPPINGS_FILE' and mode == 'live':
             if old in ('./config/product-mappings.yaml', './config/product-mappings.live.yaml'):
                 value = './config/product-mappings.live.yaml'
