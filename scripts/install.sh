@@ -42,6 +42,14 @@ if [[ -n "${COMPOSE_PROJECT_NAME:-}" && "$COMPOSE_PROJECT_NAME" != "$project_nam
   exit 1
 fi
 
+# Never attach a fresh checkout to an existing project's PostgreSQL volume.
+# An intentional recovery must use a verified backup/restore procedure instead.
+if [[ ! -f secrets/installation-mode ]] &&
+   docker volume inspect "${project_name}_postgres_data" >/dev/null 2>&1; then
+  echo 'ERROR: This Compose project already owns a PostgreSQL volume. Use a new project name to avoid data mixing.' >&2
+  exit 1
+fi
+
 # Prevent accidentally reusing a Demo database as Live (or vice versa).
 if [[ -f secrets/installation-mode ]]; then
   installed_mode="$(cat secrets/installation-mode)"
