@@ -54,6 +54,9 @@ DASHBOARDS = {
          'SELECT unknown_version_installations FROM reporting.data_quality_overview', 6),
         ('Active Software Installations', 'scalar',
          'SELECT active_installations FROM reporting.data_quality_overview', 6),
+        ('Products With Ingested Advisory Records', 'scalar',
+         'SELECT count(*) FROM reporting.data_quality_products '
+         'WHERE has_ingested_advisory_records', 6),
         ('Verified vs Unmapped Active Products', 'pie',
          'SELECT mapping_status, count(*) AS product_count '
          'FROM reporting.data_quality_products GROUP BY mapping_status ORDER BY product_count DESC', 12),
@@ -70,6 +73,10 @@ DASHBOARDS = {
          'SELECT software, vendor, active_asset_count, active_installation_rows, '
          'unknown_version_installations FROM reporting.data_quality_products '
          "WHERE mapping_status='unmapped' ORDER BY active_asset_count DESC, software LIMIT 2000", 24),
+        ('Mapped Products vs Ingested Advisories', 'table',
+         'SELECT software, vendor, ecosystem, package_name, active_asset_count, '
+         'has_ingested_advisory_records FROM reporting.data_quality_products '
+         "WHERE mapping_status='approved_mapping' ORDER BY active_asset_count DESC LIMIT 2000", 24),
         ('Mapping Review Queue', 'table',
          'SELECT review_id, vendor, software, ecosystem, package_name, similarity, origin, '
          'proposed_by, created_at FROM reporting.mapping_review_queue '
