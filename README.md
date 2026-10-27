@@ -84,6 +84,23 @@ Copy `example.env` to a private `.env` before installation. It contains `METABAS
 
 For **every command**, all optional fields, HTTPS configuration, backup/restore, and troubleshooting, read the [complete step-by-step installation guide](docs/INSTALLATION.md) and [configuration reference](docs/CONFIGURATION.md).
 
+## Test ManageEngine APIs independently (before LIVE installation)
+
+No Docker or database is required. The GET-only smoke test prints **both API endpoints** and reports PASS/FAIL/SKIP, response timing, and first-page record counts. It reads the HTTPS URL from `config/application.yaml` and the token from `secrets/manageengine_token`.
+
+```bash
+cp config/application.example.yaml config/application.yaml
+nano config/application.yaml           # set manageengine.url
+mkdir -p secrets
+nano secrets/manageengine_token        # enter read-only token; never commit
+chmod 600 secrets/manageengine_token
+python3 scripts/test_manageengine_api.py
+# Optional: python3 scripts/test_manageengine_api.py --resource-id 12345
+# Optional internal CA: --ca-bundle secrets/certs/org-ca.pem
+```
+
+The test checks the first inventory page and one computer's software page; it does **not** certify pagination across all pages, data correctness, or version compatibility. A nonzero exit code indicates failure or incomplete coverage.
+
 ## Prebuilt dashboard catalog
 
 | Dashboard | What it shows |
