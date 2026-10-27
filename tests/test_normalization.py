@@ -79,3 +79,12 @@ def test_cli_rejects_invalid_inventory(tmp_path):
     mappings = tmp_path / 'mapping.yaml'
     mappings.write_text('products: []\n')
     assert main(['--inventory-csv', str(file), '--approved-mappings', str(mappings)]) == 2
+
+
+def test_runtime_lookup_keeps_approved_only_exact_keys():
+    from avm.normalization import runtime_lookup
+    idx = runtime_lookup(CATALOG)
+    assert idx[('example secure client', 'acme corp')] == ('pypi', 'example-secure-client')
+    assert ('example secure clien', 'acme corp') not in idx
+    with pytest.raises(ValueError, match='Duplicate'):
+        runtime_lookup(CATALOG + [dict(CATALOG[0])])
