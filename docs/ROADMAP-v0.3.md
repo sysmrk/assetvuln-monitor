@@ -37,7 +37,7 @@ Primary design rules:
 - [x] Read-only CLI for queue and hypothetical top-N/KEV score-point removal.
 - [x] Optional daily point-in-time risk aggregate table and reporting view.
 - [x] Safe automatic env creation, private business context, Demo/Live mode lock, unique V3 namespace and HTTPS 8445 defaults.
-- [x] Automated CI tests for Python/SQLite, synthetic PostgreSQL, reporting permissions, config syntax, and separation from V1/V2 projects.
+- [x] Automated CI tests for Python/SQLite, synthetic PostgreSQL, reporting permissions, config syntax, V1/V2 separation, and a full disposable synthetic Docker/Metabase Demo startup (successful workflow run 40599590218).
 - [x] Rewrite README, installation, configuration, security and troubleshooting for V3 simplicity and current limitations.
 
 ## Remaining validation and future features
@@ -56,7 +56,7 @@ Primary design rules:
 ## Quality gates before promotion
 
 1. GitHub Actions must pass all unit, syntax, temporary PostgreSQL and read-only Compose separation checks for the final commit.
-2. Test fresh one-command Demo in Docker, including all eight Metabase dashboards.
+2. [Partially verified] Fresh one-command Docker Demo and Metabase HTTPS/risk SQL/CLI have passed in CI; visually inspect all eight Metabase dashboards and queries in staging.
 3. Test Live integration using an approved read-only Endpoint Central token and a secure staging setup; verify actual pagination.
 4. Validate official KEV/EPSS feed refresh, failure rollback and freshness timestamps in that environment.
 5. Verify reviewer/actor access control and add production-quality audit protections.
