@@ -55,6 +55,7 @@ def test_v03_postgres_schema_and_risk_dashboard():
         with engine.connect() as conn:
             assert conn.execute(text('SELECT active_findings FROM reporting.risk_overview')).scalar() >= 1
             assert conn.execute(text('SELECT count(*) FROM reporting.risk_queue')).scalar() >= 1
+            assert conn.execute(text("SELECT count(*) FROM reporting.risk_queue WHERE kev AND cve_id='CVE-2026-55555'")).scalar() >= 1
             assert conn.execute(text('SELECT count(*) FROM reporting.finding_evidence')).scalar() >= 1
             assert conn.execute(text('SELECT count(*) FROM reporting.risk_trend')).scalar() >= 1
             assert conn.execute(text('SELECT count(*) FROM reporting.risk_by_owner')).scalar() >= 1
