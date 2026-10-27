@@ -5,7 +5,7 @@
 # For production, set mode to live and configure the ManageEngine section.
 # No remote WRITE, POST, PUT, PATCH or DELETE operations are implemented.
 # Only edit values to the right of ':'. YAML indentation MUST use spaces.
-# Secrets and passwords belong in your private .env (copied from example.env) or secrets/ folder.
+# Secrets belong in your generated private .env or secrets/ folder.
 # ============================================================================
 application:
   mode: demo                       # demo | live
@@ -35,6 +35,11 @@ cve:
   sync_minutes: 30
   max_pages_per_poll: 5           # Bounded collection; NOT full CVE history.
   request_timeout_seconds: 30
+
+# Live mode only; no API keys. GET-only public feeds, refreshed daily.
+threat_intelligence:
+  enabled: true
+  sync_hours: 24
 
 matching:
   # A match is generated only for an explicit package identity AND a proven
