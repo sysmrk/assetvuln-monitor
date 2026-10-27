@@ -9,7 +9,7 @@
 # ============================================================================
 application:
   mode: demo                       # demo | live
-  timezone: Asia/Tehran
+  timezone: UTC
 
 manageengine:
   # On-premises Endpoint Central base URL (NOT the whole API path).
