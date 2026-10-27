@@ -8,7 +8,7 @@ from avm import ops
 
 
 def test_simulation_and_accepted_risk_are_explicit(tmp_path, monkeypatch, capsys):
-    engine = create_engine('sqlite+pysqlite:///:memory:')
+    engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'ops.sqlite'}")
     Base.metadata.create_all(engine)
     maker = sessionmaker(bind=engine, expire_on_commit=False)
     with maker() as db:
