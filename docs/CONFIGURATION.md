@@ -47,3 +47,7 @@ Before `./install.sh --live`, run `python3 scripts/test_manageengine_api.py` aft
 ## v0.2 mapping review and normalization
 
 In the `develop/v0.2` branch, the runtime worker matches only **operator-approved** YAML identities, now comparing software vendor/name with Unicode NFKC, case folding and collapsed whitespace. Duplicate approved identities are rejected instead of silently overwritten. The offline `scripts/suggest_mappings.py` produces candidate suggestions and coverage metrics from a CSV export, but **never modifies the YAML, database or findings**. All similar-name suggestions require manual verification. See [normalization guide](SOFTWARE-NORMALIZATION.md).
+
+## v0.2 database-backed mapping review
+
+The worker now saves similar-name identity candidates into `mapping_reviews` as `pending` **only after a successful, committed inventory sync**. Operators can create explicit pending proposals and review them with `docker compose exec worker python -m avm.review_cli ...`. The approval record is stored in `approved_software_mappings`; an application-level append-only decision history is stored in `mapping_decisions`. Approved DB identities are merged with the verified Live YAML and used in the next inventory sync. Unknown candidates cannot affect findings. Review account identifiers are caller-supplied and require trusted container/DB access; there is no SSO or tamper-proof audit yet. See [Mapping Review workflow](MAPPING-REVIEW.md) and dashboard 07.
