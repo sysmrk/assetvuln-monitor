@@ -133,7 +133,7 @@ python3 -m pytest -q tests
 docker compose config --quiet
 ~~~
 
-The V3 GitHub Actions workflow runs Unit tests, a throwaway PostgreSQL integration job, shell/Compose checks and V1/V2 collision comparisons. These do **not** constitute a production certification. See [V3 operations](V03-OPERATIONS.md), [security](SECURITY.md) and [troubleshooting](TROUBLESHOOTING.md).
+The V3 GitHub Actions workflow runs Unit tests, a throwaway PostgreSQL integration job, shell/Compose checks and V1/V2 collision comparisons. The GitHub Actions synthetic Docker Demo smoke test has also passed (one-command install, Metabase HTTPS health, risk reporting views and CLI). These are **not** a production certification or a real Endpoint Central test. See [V3 operations](V03-OPERATIONS.md), [security](SECURITY.md) and [troubleshooting](TROUBLESHOOTING.md).
 
 ## Critical limitation
 
