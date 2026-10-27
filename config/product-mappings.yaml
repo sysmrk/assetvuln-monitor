@@ -1,0 +1,15 @@
+# Explicit, auditable identity mapping for installed software.
+# This is NOT a wildcard substring list. Product name AND vendor must match
+# (case-insensitive) to associate an inventory entry with a package identity.
+# The ecosystems and names must be present in cve.now's structured advisories.
+# Add verified mappings for your organization after inspecting real inventory.
+# Without a mapping, the software remains inventoried but NOT CVE-matched.
+products:
+  - vendor: "Demo Software Foundation"
+    name: "Demo Web Framework"
+    ecosystem: "PyPI"
+    package: "demo-web-framework"
+  - vendor: "Demo Software Foundation"
+    name: "Demo Utility Library"
+    ecosystem: "npm"
+    package: "demo-util"

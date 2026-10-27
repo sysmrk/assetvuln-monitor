@@ -1,0 +1,52 @@
+# ============================================================================
+# AssetVuln Monitor - Main configuration
+# ============================================================================
+# Start in DEMO mode when testing without access to ManageEngine.
+# For production, set mode to live and configure the ManageEngine section.
+# No remote WRITE, POST, PUT, PATCH or DELETE operations are implemented.
+# Only edit values to the right of ':'. YAML indentation MUST use spaces.
+# Secrets and passwords belong in the generated .env or secrets/ folder.
+# ============================================================================
+application:
+  mode: demo                       # demo | live
+  timezone: Asia/Tehran
+
+manageengine:
+  # On-premises Endpoint Central base URL (NOT the whole API path).
+  # Examples:
+  #   https://endpoint-central.example.org:8383
+  #   https://10.20.30.40:8383
+  url: "https://endpoint-central.example.org:8383"
+  # API token is read from secrets/manageengine_token (never paste it here).
+  token_file: /run/secrets/manageengine_token
+  # Always use TLS certificate verification for production connections.
+  verify_tls: true
+  # Custom trusted CA path in container (copy file into secrets/certs/):
+  #   /opt/avm/certs/organization-root-ca.pem
+  ca_bundle: ""
+  # Scan computers, then retrieve per-device software information.
+  # Endpoints are from the official on-premises API documentation.
+  sync_minutes: 360
+  max_assets: 10000               # Hard safety cap per sync.
+  max_pages: 500                  # Fail closed on unexpected pagination.
+
+cve:
+  url: "https://cve.now"
+  sync_minutes: 30
+  max_pages_per_poll: 5           # Bounded collection; NOT full CVE history.
+  request_timeout_seconds: 30
+
+matching:
+  # A match is generated only for an explicit package identity AND a proven
+  # affected-version range or exact version. Similar names are NOT enough.
+  mappings_file: /opt/avm/config/product-mappings.yaml
+
+notifications:
+  # Optional SMTP notifications are disabled until explicitly enabled.
+  email_enabled: false
+  smtp_host: "smtp.example.org"
+  smtp_port: 587
+  smtp_starttls: true
+  sender: "security-alerts@example.org"
+  recipients: ["soc@example.org"]
+  # Add SMTP_USER and SMTP_PASSWORD to .env locally if enabling email.

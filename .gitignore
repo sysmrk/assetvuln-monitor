@@ -1,0 +1,14 @@
+.env
+config/application.yaml
+secrets/*
+!secrets/.gitkeep
+!secrets/tls/
+secrets/tls/*
+!secrets/tls/.gitkeep
+!secrets/certs/
+secrets/certs/*
+!secrets/certs/.gitkeep
+__pycache__/
+.pytest_cache/
+*.pyc
+*.log
