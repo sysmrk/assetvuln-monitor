@@ -2,7 +2,7 @@
 # This is NOT a wildcard substring list. Product name AND vendor must match
 # (case-insensitive) to associate an inventory entry with a package identity.
 # The ecosystems and names must be present in cve.now's structured advisories.
-# Add verified mappings for your organization after inspecting real inventory.
+# DEMO ONLY. For Live use config/product-mappings.live.yaml and set PRODUCT_MAPPINGS_FILE in .env.
 # Without a mapping, the software remains inventoried but NOT CVE-matched.
 products:
   - vendor: "Demo Software Foundation"
