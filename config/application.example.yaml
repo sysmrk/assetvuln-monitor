@@ -41,6 +41,14 @@ threat_intelligence:
   enabled: true
   sync_hours: 24
 
+# Optional operator priority SLA targets (days since first potential detection).
+risk:
+  sla_days:
+    P1: 7
+    P2: 30
+    P3: 90
+    P4: 180
+
 matching:
   # A match is generated only for an explicit package identity AND a proven
   # affected-version range or exact version. Similar names are NOT enough.
