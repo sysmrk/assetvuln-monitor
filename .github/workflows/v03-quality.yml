@@ -71,6 +71,7 @@ jobs:
         run: |
           python scripts/prepare_env.py --mode demo
           cp config/application.example.yaml config/application.yaml
+          cp config/asset-context.example.yaml config/asset-context.yaml
           mkdir -p secrets/certs secrets/tls
           : > secrets/manageengine_token
           cp baseline-v01/example.env baseline-v01/.env
