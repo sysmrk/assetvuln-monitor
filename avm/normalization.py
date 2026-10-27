@@ -122,3 +122,16 @@ def mapping_report(installed, approved, min_similarity=0.88, limit=3):
         'suggestions': proposals,
         'warning': 'Name similarity is not product identity; all candidates require human review. No mappings are written.',
     }
+
+
+def runtime_lookup(rows):
+    """Approved-only runtime keys: (normalized name, normalized vendor) -> package.
+
+    This intentionally never reads suggested candidates. A missing mapping
+    stays unmapped; normalize strictly for exact identity matching only.
+    """
+    validated = approved_index(rows)
+    return {
+        (name, vendor): (normalized_label(mapping['ecosystem']), normalized_label(mapping['package']))
+        for (vendor, name), mapping in validated.items()
+    }
