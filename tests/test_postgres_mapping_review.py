@@ -62,6 +62,14 @@ def test_postgres_review_schema_reporting_views_and_reader_permissions():
                          'data_quality_sync_freshness'):
                 conn.execute(text(f'SELECT * FROM reporting.{name} LIMIT 1')).all()
 
+        # Verify the role grants independently of failed INSERT constraints.
+        with engine.connect() as conn:
+            for privilege in ('SELECT', 'INSERT', 'UPDATE', 'DELETE'):
+                allowed = conn.execute(text(
+                    "SELECT has_table_privilege('avm_reader', 'public.mapping_reviews', :priv)"
+                ), {'priv': privilege}).scalar()
+                assert allowed is False, f'avm_reader unexpectedly has {privilege} on raw review data'
+
         # Verify that Metabase's reader gets only the reporting view, not base table access.
         reader = create_engine(
             'postgresql+psycopg://avm_reader:ci_reader_local_only@127.0.0.1:5432/avm')
