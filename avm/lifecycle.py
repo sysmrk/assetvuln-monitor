@@ -75,8 +75,8 @@ def recalculate_findings(session, *, allow_disappearance=False):
                 record.workflow_state = 'open'
                 record.state_updated_at = stamp
 
-            result = priority_score(cvss=vulnerability.cvss, epss=vulnerability.epss,
-                                    kev=bool(vulnerability.kev),
+            result = priority_score(cvss=vulnerability.cvss, epss=(vulnerability.epss if (vulnerability.synthetic or vulnerability.epss_asof is not None) else None),
+                                    kev=(bool(vulnerability.kev_verified) or (vulnerability.synthetic and bool(vulnerability.kev))),
                                     criticality=asset.criticality or 'unknown',
                                     internet_facing=asset.internet_facing)
             evidence = evidence_packet(asset=asset, software=product, installation=installed,
@@ -114,8 +114,8 @@ def recalculate_findings(session, *, allow_disappearance=False):
             installed = session.get(Installation, finding.installation_id)
             asset = assets.get(installed.asset_id) if installed else None
             if vulnerability and asset:
-                score = priority_score(cvss=vulnerability.cvss, epss=vulnerability.epss,
-                                       kev=bool(vulnerability.kev),
+                score = priority_score(cvss=vulnerability.cvss, epss=(vulnerability.epss if (vulnerability.synthetic or vulnerability.epss_asof is not None) else None),
+                                       kev=(bool(vulnerability.kev_verified) or (vulnerability.synthetic and bool(vulnerability.kev))),
                                        criticality=asset.criticality or 'unknown',
                                        internet_facing=asset.internet_facing)
                 finding.risk_score = score['score']
