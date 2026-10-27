@@ -73,7 +73,7 @@ def main(argv=None):
                           for f, asset, v in findings if f.risk_score is not None]
                 if args.operation == 'simulate':
                     if args.kev:
-                        ids = [f.id for f, asset, v in findings if v.kev]
+                        ids = [f.id for f, asset, v in findings if bool(v.kev_verified) or (v.synthetic and v.kev)]
                         result = scenario_summary(scored, remove_ids=ids)
                         result['scenario'] = 'all_current_kev_matches'
                     else:
