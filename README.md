@@ -37,7 +37,7 @@ grep '^METABASE_ADMIN_EMAIL=' .env
 grep '^METABASE_ADMIN_PASSWORD=' .env
 ```
 
-Open **https://localhost:8443**. The localhost TLS certificate is self-signed for demo use. Set the Metabase password in `.env` before installing and provisions six dashboards automatically. Demo records are synthetic, clearly labeled `CVE-DEMO-*`, and never fetched from ManageEngine.
+Open **https://localhost:8443**. The localhost TLS certificate is self-signed for demo use. Set the Metabase password in `.env` before installing; the installer provisions six dashboards automatically. Demo records are synthetic, clearly labeled `CVE-DEMO-*`, and never fetched from ManageEngine.
 
 ### LIVE — real inventory (separate clean deployment)
 
@@ -55,7 +55,9 @@ nano config/application.yaml
 mkdir -p secrets/certs secrets/tls
 nano secrets/manageengine_token
 chmod 600 secrets/manageengine_token config/application.yaml
-nano config/product-mappings.yaml
+nano config/product-mappings.live.yaml  # optional: verified organization-specific identities
+# In .env set PRODUCT_MAPPINGS_FILE=./config/product-mappings.live.yaml
+python3 scripts/test_manageengine_api.py  # verify APIs before installation
 ./install.sh --live
 docker compose ps
 docker compose logs --tail=200 worker
