@@ -63,6 +63,7 @@ class Vulnerability(Base):
     cvss = Column(Numeric(4, 1))
     epss = Column(Numeric(8, 6))
     kev = Column(Boolean, nullable=False, default=False)
+    kev_verified = Column(Boolean, nullable=False, default=False)
     epss_asof = Column(DateTime(timezone=True))
     kev_action = Column(Text)
     intel_checked_at = Column(DateTime(timezone=True))
@@ -212,7 +213,7 @@ V3_ADDITIVE_COLUMNS = {
         "business_service varchar(200) NOT NULL DEFAULT ''",
         "owner varchar(200) NOT NULL DEFAULT ''",
     ),
-    'vulnerabilities': ('epss_asof timestamptz', 'kev_action text',
+    'vulnerabilities': ('kev_verified boolean NOT NULL DEFAULT false', 'epss_asof timestamptz', 'kev_action text',
                         'intel_checked_at timestamptz'),
     'findings': ('risk_score numeric(5,2)', 'priority varchar(3)',
                  'risk_factors json', 'evidence_packet json', 'remediation json',
