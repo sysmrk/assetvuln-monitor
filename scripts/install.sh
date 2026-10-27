@@ -40,22 +40,34 @@ fi
 if [[ ! -f secrets/manageengine_token ]]; then
   : > secrets/manageengine_token
 fi
-if [[ ! -s .env ]]; then
-  cat > .env <<ENV
-# PRIVATE GENERATED CREDENTIALS. Keep chmod 600 and NEVER upload this file.
-HOST_UID=$(id -u)
-HOST_GID=$(id -g)
-POSTGRES_PASSWORD=$(openssl rand -hex 30)
-APP_DB_PASSWORD=$(openssl rand -hex 30)
-REPORT_DB_PASSWORD=$(openssl rand -hex 30)
-MB_DB_PASSWORD=$(openssl rand -hex 30)
-METABASE_ADMIN_EMAIL=admin@example.local
-METABASE_ADMIN_PASSWORD=$(openssl rand -hex 24)
-BIND_IP=127.0.0.1
-HTTPS_PORT=8443
-PUBLIC_URL=https://localhost:8443
-ENV
+if [[ ! -f .env ]]; then
+  echo 'ERROR: .env is missing. Run: cp example.env .env; then edit .env before installing.' >&2
+  exit 1
 fi
+if [[ ! -s .env ]]; then
+  echo 'ERROR: .env is empty. Configure it from example.env before installing.' >&2
+  exit 1
+fi
+# Validate required credentials without printing secret values or modifying .env.
+# Do not source .env as shell code: validate with Compose interpolation instead.
+required=(POSTGRES_PASSWORD APP_DB_PASSWORD REPORT_DB_PASSWORD MB_DB_PASSWORD METABASE_ADMIN_PASSWORD)
+for key in "${required[@]}"; do
+  value="$(docker compose config --format json 2>/dev/null | python3 -c '
+import json,sys
+try:
+    c=json.load(sys.stdin)
+    k=sys.argv[1]
+    mapping={"POSTGRES_PASSWORD":("postgres","POSTGRES_PASSWORD"),"APP_DB_PASSWORD":("worker","APP_DB_PASSWORD"),"REPORT_DB_PASSWORD":("bootstrap","REPORT_DB_PASSWORD"),"MB_DB_PASSWORD":("metabase","MB_DB_PASS"),"METABASE_ADMIN_PASSWORD":("bootstrap","METABASE_ADMIN_PASSWORD")}
+    service,field=mapping[k]
+    print(c["services"][service]["environment"][field])
+except Exception:
+    sys.exit(1)
+' "$key")" || { echo "ERROR: Invalid Compose configuration or missing $key in .env" >&2; exit 1; }
+  if [[ -z "$value" || "$value" == CHANGE_ME* ]]; then
+    echo "ERROR: Set a strong value for $key in .env before installation." >&2
+    exit 1
+  fi
+done
 chmod 600 .env secrets/manageengine_token config/application.yaml
 if [[ ! -s secrets/tls/tls.key || ! -s secrets/tls/tls.crt ]]; then
   echo 'Generating temporary TLS certificate for localhost (browser warning is expected)...'
@@ -90,9 +102,9 @@ fi
 echo
 echo '==============================================================='
 echo '  AssetVuln Monitor - installation finished'
-echo '  URL: https://localhost:8443'
-echo '  Login email: admin@example.local'
-echo '  Initial admin password: stored in .env (METABASE_ADMIN_PASSWORD)'
+echo '  URL: see PUBLIC_URL in .env'
+echo '  Login email: see METABASE_ADMIN_EMAIL in .env'
+echo '  Initial admin password: configured in .env (METABASE_ADMIN_PASSWORD)'
 echo "  Data source mode: $mode"
 echo '  Self-signed TLS warning: expected for local WSL demo.'
 echo '  View logs: docker compose logs -f worker'
