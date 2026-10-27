@@ -1,53 +1,105 @@
-# Configuration reference
+# Configuration — V3
 
-Runtime configuration uses **both** `.env` (Compose credentials, bind settings and build index) and `config/application.yaml` (application behavior). It is created from the heavily commented `config/application.example.yaml` during install.
+The default Demo is **fully configured by ./install.sh --demo**. Change settings only when you need live inventory, verified asset business context or optional mail. Do not manually enter database passwords for the Demo; the installer generates separate random values.
 
-- `application.mode`: `demo` or `live`; use `demo` in WSL without ManageEngine.
-- `manageengine.url`: HTTPS base URL (example `https://ec.example.org:8383`). Do **not** add an `/api` suffix.
-- `manageengine.token_file`: default `/run/secrets/manageengine_token`; this is read-only inside the container.
-- `manageengine.verify_tls`: must stay `true` in live mode.
-- `manageengine.ca_bundle`: optional container path to CA file mounted from `secrets/certs`.
-- `manageengine.sync_minutes`: inventory refresh cadence, default 360 minutes.
-- `cve.url`: default `https://cve.now`.
-- `cve.sync_minutes`: advisory polling interval, default 30 minutes.
-- `cve.max_pages_per_poll`: bounded number of latest CVE pages. **Not** a guarantee of historical coverage.
-- `matching.mappings_file`: explicit package identity mapping file mounted into the worker.
-- `notifications.email_enabled`: default `false` (never sends in demo mode). SMTP only supports STARTTLS; add SMTP_USER and SMTP_PASSWORD environment variables for optional authentication.
+## Local configuration
 
-Before installing, run `cp example.env .env` and edit `.env`: replace all `CHANGE_ME_*` placeholders with unique strong secrets, set `HOST_UID`/`HOST_GID` from `id -u` / `id -g`, and adjust `PUBLIC_URL`, `BIND_IP`, `HTTPS_PORT` as needed. Installer requires `.env`, protects it with mode `0600`, and never overwrites it. `PIP_INDEX_URL` optionally selects the Python package index used during Docker image builds; use a trusted index. `.env` is intentionally excluded from Git. Install proper TLS files in `secrets/tls` before a network-facing deployment.
+| File | Default action | Stored privately? |
+|---|---|---|
+| .env | Automatically generated from example.env; unique passwords | Yes, 0600 and git-ignored |
+| config/application.yaml | Automatically generated from the commented example | Yes, git-ignored |
+| config/asset-context.yaml | Automatically copied from the empty sample | Yes, git-ignored |
+| secrets/manageengine_token | Empty in Demo; verified read-only token needed in Live | Yes, 0600 |
+| config/product-mappings.yaml | Synthetic Demo software identities | Tracked sample |
+| config/product-mappings.live.yaml | Empty, safe Live mapping source | Tracked empty sample |
 
-## Version mapping
+Avoid changing environment mode on an existing database. An installation-mode marker prevents reusing Demo data as Live.
 
-When an inventory entry identifies a package with a verified ecosystem (e.g. PyPI, npm), define exact vendor+name mapping in `config/product-mappings.yaml`. Do not map general software names to unrelated package versions just to increase matches. The conservative engine does **not** currently implement generic CPE-range logic, vendor backport verification, or a full SBOM parser.
+## Compose and secrets (.env)
 
-## Credentials
+- COMPOSE_PROJECT_NAME: default assetvuln-monitor-v03, **never** V1 or V2.
+- BIND_IP: 127.0.0.1, loopback-only by default.
+- HTTPS_PORT: 8445 by default.
+- PUBLIC_URL: https://localhost:8445 by default.
+- HOST_UID, HOST_GID: generated from the installing user for secrets access.
+- APP_DB_PASSWORD, POSTGRES_PASSWORD, REPORT_DB_PASSWORD, MB_DB_PASSWORD, METABASE_ADMIN_PASSWORD: generated separately if missing or placeholder.
+- METABASE_ADMIN_EMAIL: change the default example address before Live exposure.
+- PRODUCT_MAPPINGS_FILE: selected as a synthetic Demo mapping or empty Live mapping according to installation mode; do not mix them.
 
-In production, create a least-privilege Endpoint Central account/token with only the inventory read scope. Store it in `secrets/manageengine_token` (permission `0600`). Never paste passwords into GitHub issues, screenshots or logs.
+Do not commit actual .env, certificates, credentials, asset-context configuration, inventory exports or backups. Backup/restore scripts manage the two PostgreSQL application databases for this **one** Compose project.
 
-## Software identity mappings
+## Application YAML
 
-**Demo** uses `config/product-mappings.yaml`: two deliberately synthetic identities matching `avm/demo.py`. **Live** must use `config/product-mappings.live.yaml` by setting `PRODUCT_MAPPINGS_FILE=./config/product-mappings.live.yaml` in `.env`. This file starts with `products: []` so that real assets are inventoried but not assigned unverified CVE findings.
+| Key | Meaning |
+|---|---|
+| application.mode | demo or live |
+| manageengine.url | Your HTTPS Endpoint Central base URL; no API suffix |
+| manageengine.token_file | /run/secrets/manageengine_token |
+| manageengine.verify_tls | Must stay true in Live |
+| manageengine.ca_bundle | Optional in-container path under /opt/avm/certs |
+| manageengine.sync_minutes | Default 360 |
+| manageengine.max_assets / max_pages | Safety caps; incomplete collection fails instead of truncating |
+| cve.url | Default https://cve.now |
+| cve.sync_minutes | Default 30 |
+| cve.max_pages_per_poll | Default 5; intentionally bounded, not a CVE historical backfill |
+| threat_intelligence.enabled | Default true; only Live uses the public feeds |
+| threat_intelligence.sync_hours | Default 24; automatic GET-only refresh |
+| matching.mappings_file | Worker path to mounted mapping YAML |
+| notifications.email_enabled | Default false; optional SMTP configuration must be independently verified |
 
-Each mapping has four fields: `vendor` and `name` (exact, case-insensitive match against ManageEngine software inventory), and `ecosystem` and `package` (verified identity in the structured CVE advisory). Example **format only**:
+No additional API keys are required for CISA KEV or FIRST EPSS. The Worker uses fixed HTTPS origins:
+- CISA KEV: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+- FIRST EPSS: https://api.first.org/data/v1/epss
 
-```yaml
-products:
-  - vendor: "Verified Vendor From Inventory"
-    name: "Verified Product From Inventory"
-    ecosystem: "PyPI"
-    package: "verified-package-from-advisory"
-```
+The FIRST API is designed for small lookup batches of already-known CVEs; it is **not** treated as a bulk daily mirror. Existing EPSS/KEV values are kept if the refresh fails. The retrieval timestamp indicates when AVM checked the source, not a guarantee of publication freshness.
 
-Do not map unrelated products based on name similarity. A missing mapping does not hide the software from inventory; it prevents unsupported version-based CVE correlation. Vendor patches and backports still require manual verification.
+## Explicit asset context (optional)
 
-## Independent ManageEngine API test
+Configure real business/service criticality only after validating it against organizational inventory or CMDB:
 
-Before `./install.sh --live`, run `python3 scripts/test_manageengine_api.py` after configuring the HTTPS URL and read-only token. It lists both GET endpoints and checks their initial JSON responses, with PASS/FAIL/SKIP results. Options include `--resource-id 12345` and `--ca-bundle secrets/certs/org-ca.pem`. No Docker or database required; no secrets printed. This is a smoke test, not exhaustive API compatibility validation.
+~~~yaml
+assets:
+  - source_id: "301"
+    criticality: critical
+    internet_facing: true
+    business_service: "Payment API"
+    owner: "Payments"
+~~~
 
-## v0.2 mapping review and normalization
+The Worker reads config/asset-context.yaml every inventory synchronization. Unspecified assets get criticality unknown and Internet exposure null (unknown). It does not infer Internet exposure from a hostname, IP range or a DNS name.
 
-In the `develop/v0.2` branch, the runtime worker matches only **operator-approved** YAML identities, now comparing software vendor/name with Unicode NFKC, case folding and collapsed whitespace. Duplicate approved identities are rejected instead of silently overwritten. The offline `scripts/suggest_mappings.py` produces candidate suggestions and coverage metrics from a CSV export, but **never modifies the YAML, database or findings**. All similar-name suggestions require manual verification. See [normalization guide](SOFTWARE-NORMALIZATION.md).
+The current configuration is deliberately a short explicit file, not an invented full CMDB integration. A future integration should preserve authoritative source and freshness evidence.
 
-## v0.2 database-backed mapping review
+## Reviewed mapping sources
 
-The worker now saves similar-name identity candidates into `mapping_reviews` as `pending` **only after a successful, committed inventory sync**. Operators can create explicit pending proposals and review them with `docker compose exec worker python -m avm.review_cli ...`. The approval record is stored in `approved_software_mappings`; an application-level append-only decision history is stored in `mapping_decisions`. Approved DB identities are merged with the verified Live YAML and used in the next inventory sync. Unknown candidates cannot affect findings. Review account identifiers are caller-supplied and require trusted container/DB access; there is no SSO or tamper-proof audit yet. See [Mapping Review workflow](MAPPING-REVIEW.md) and dashboard 07.
+Demo uses two deliberately synthetic approved identities; Live starts with no approvals. An exact normalized vendor/name can be approved using a privileged operator action after independent verification, and automatically proposed similarities remain **pending** until that action. See [Mapping Review](MAPPING-REVIEW.md).
+
+## Risk priority semantics
+
+V3 prioritization components (maximum total 100 points):
+
+| Component | Maximum |
+|---|---:|
+| CVSS v3/v4 value normalized to 0–10 | 40 |
+| EPSS 0–1 (square-root transformation) | 20 |
+| CISA KEV catalog membership | 25 |
+| Explicit asset criticality | 10 |
+| Explicit Internet exposure | 5 |
+
+A KEV entry enforces a floor of 75 priority points (P1) for that *potential match*. Missing signals are reported separately rather than silently represented as known zero evidence. The score is not the likelihood of exploitation.
+
+Priorities: P1 ≥75, P2 ≥50, P3 ≥25, P4 below 25. Default remediation SLA targets: P1 7 days, P2 30, P3 90, P4 180, measured from first observation. SLA calculations are **internal model defaults**, not external regulatory requirements or contractual guarantees; tailor operational policy before use.
+
+Risk acceptances last 1–180 days, require a privileged CLI command with evidence-backed explanation and are audited in the app DB. The operator identifier is self-declared; RBAC/SSO is not yet implemented.
+
+## Updating settings
+
+After editing application YAML, restart the v0.3 Worker (this changes only the local Compose project):
+
+~~~bash
+docker compose restart worker
+~~~
+
+Asset-context values are applied at the next inventory sync. New mapping approvals also take effect on that sync. A restart alone does not force source collection if the Worker is already processing; inspect logs for recorded collection completion.
+
+More details: [V3 operations](V03-OPERATIONS.md), [installation](INSTALLATION.md), [security](SECURITY.md).
