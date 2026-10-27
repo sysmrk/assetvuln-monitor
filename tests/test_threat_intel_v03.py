@@ -63,9 +63,11 @@ def test_atomic_merge_keeps_demo_and_missing_epss_safe():
                                       epss_values={real.id: .81}) == 1
         session.commit()
         assert real.kev is True
+        assert real.kev_verified is True
         assert float(real.epss) == .81
         assert real.kev_action == 'Vendor mitigation needed'
         assert demo.kev is True
+        assert demo.kev_verified is False
         assert float(demo.epss) == .52
         assert real.intel_checked_at is not None
     engine.dispose()
