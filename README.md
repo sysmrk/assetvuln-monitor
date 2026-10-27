@@ -6,7 +6,20 @@ Endpoint Central ➜ PostgreSQL ➜ conservative CVE correlation ➜ automatical
 
 > **Status: v0.1 technical preview.** Demo fixtures and unit tests have been exercised, but a real Endpoint Central instance and Docker runtime were **not available** in the build environment. Production integrations must be validated against your actual build and the current cve.now response format before operational use.
 
-**v0.2 isolation:** use `COMPOSE_PROJECT_NAME=assetvuln-monitor-v02`, `HTTPS_PORT=8444`, and `PUBLIC_URL=https://localhost:8444` in this branch's `.env`. Never reuse v0.1 database volumes. See [v0.2 isolation guide](docs/V02-ISOLATION.md).\n\n## Quick start: choose DEMO or LIVE
+**v0.2 isolation:** use `COMPOSE_PROJECT_NAME=assetvuln-monitor-v02`, `HTTPS_PORT=8444`, and `PUBLIC_URL=https://localhost:8444` in this branch's `.env`. Never reuse v0.1 database volumes. See [v0.2 isolation guide](docs/V02-ISOLATION.md).
+
+## v0.2 — Offline software normalization and quality checks
+
+Phase-two code is isolated on `develop/v0.2`. An offline **review-only** suggestion engine is available; it does not change approved mappings or generate new vulnerability findings. Start with the synthetic fixtures:
+
+```bash
+python3 scripts/suggest_mappings.py --inventory-csv examples/software-inventory.sample.csv --approved-mappings examples/mapping-catalog.sample.yaml --output mapping-review.json
+python3 -m pytest -q
+```
+
+See [software normalization and mapping review](docs/SOFTWARE-NORMALIZATION.md) and [v0.2 roadmap](docs/ROADMAP-v0.2.md). To validate Compose isolation against a v0.1 checkout, run `python3 scripts/check_compose_isolation.py --baseline-dir /path/to/v0.1` before starting both deployments. GitHub Actions runs unit tests and Compose syntax checks on the development branch.
+
+## Quick start: choose DEMO or LIVE
 
 > **Important:** v0.1 is a technical preview. The demo can be evaluated locally; the live Endpoint Central/cve.now integration has not yet been validated against real vendor responses and is **not production-certified**. The application is read-only toward managed assets in both modes.
 
@@ -23,8 +36,8 @@ docker info --format '{{.ServerVersion}}'
 
 # Download and run:
 cd /opt/src
-git clone https://github.com/sysmrk/assetvuln-monitor.git
-cd assetvuln-monitor
+git clone --branch develop/v0.2 https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-v02
+cd assetvuln-monitor-v02
 cp example.env .env
 nano .env  # replace ALL CHANGE_ME_* passwords before installing
 ./install.sh --demo
@@ -37,19 +50,19 @@ grep '^METABASE_ADMIN_EMAIL=' .env
 grep '^METABASE_ADMIN_PASSWORD=' .env
 ```
 
-Open **https://localhost:8443**. The localhost TLS certificate is self-signed for demo use. Set the Metabase password in `.env` before installing; the installer provisions six dashboards automatically. Demo records are synthetic, clearly labeled `CVE-DEMO-*`, and never fetched from ManageEngine.
+Open **https://localhost:8444**. The localhost TLS certificate is self-signed for demo use. Set the Metabase password in `.env` before installing; the installer provisions six dashboards automatically. Demo records are synthetic, clearly labeled `CVE-DEMO-*`, and never fetched from ManageEngine.
 
 ### LIVE — real inventory (separate clean deployment)
 
-**Never reuse a demo database for live assets:** demo data is not automatically removed. Use a fresh Docker project/volume, ideally on a separate host. **A separate directory alone is not sufficient:** the Compose file sets a fixed project name, so the default named volume would otherwise be shared.
+**Never reuse a demo database for live assets:** demo data is not automatically removed. Use a fresh Docker project/volume, ideally on a separate host. **A separate directory alone is not sufficient:** assign an independent `COMPOSE_PROJECT_NAME` to each v0.2 instance, and use a different HTTPS port. Do not share database volumes.
 
 ```bash
 # Recommended: execute on a fresh host with no existing AssetVuln Monitor Compose stack.
 cd /opt
-git clone https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-live
+git clone --branch develop/v0.2 https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-live
 cd assetvuln-monitor-live
 cp example.env .env
-nano .env  # replace all CHANGE_ME_* values, set PUBLIC_URL and bind settings
+nano .env  # choose a UNIQUE COMPOSE_PROJECT_NAME, HTTPS_PORT, PUBLIC_URL and secrets
 cp config/application.example.yaml config/application.yaml
 nano config/application.yaml
 mkdir -p secrets/certs secrets/tls
