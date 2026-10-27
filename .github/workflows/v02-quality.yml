@@ -1,0 +1,50 @@
+name: v0.2 quality gates
+
+on:
+  push:
+    branches: [develop/v0.2]
+  pull_request:
+    branches: [develop/v0.2]
+
+permissions:
+  contents: read
+
+jobs:
+  unit-and-compose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+      - name: Static syntax and shell validation
+        run: |
+          python -m compileall -q avm scripts tests
+          bash -n scripts/install.sh
+      - name: Unit tests
+        run: python -m pytest -q
+      - name: Resolve v0.2 Compose configuration (no containers started)
+        run: |
+          cp example.env .env
+          sed -i 's/CHANGE_ME_[A-Z_]*/ci-dummy-credential/g' .env
+          cp config/application.example.yaml config/application.yaml
+          mkdir -p secrets/certs secrets/tls
+          : > secrets/manageengine_token
+          docker compose config --quiet
+          docker compose --profile setup config --quiet
+          docker compose config --format json | python -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          assert data["name"] == "assetvuln-monitor-v02", "wrong Compose project namespace"
+          published = data["services"]["nginx"]["ports"]
+          assert len(published) == 1
+          assert str(published[0]["published"]) == "8444", "v0.2 port collision"
+          assert published[0]["host_ip"] == "127.0.0.1", "unexpected public bind"
+          print("PASS: isolated project and default HTTPS binding")
+          '
