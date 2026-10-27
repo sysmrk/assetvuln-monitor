@@ -59,11 +59,11 @@ Asset criticality, EPSS/KEV enrichment, risk prioritization, vulnerability lifec
 
 - Read-only Compose collision checker: `scripts/check_compose_isolation.py`; unit tests cover project, volume, network, bind and host-port overlaps.
 - Offline normalization/suggestion core: `avm/normalization.py`, `scripts/suggest_mappings.py`, synthetic examples and test coverage.
-- GitHub Actions quality workflow: `.github/workflows/v02-quality.yml` (CI execution results not yet independently verified).
+- GitHub Actions quality workflow: `.github/workflows/v02-quality.yml`, now provisioning throwaway PostgreSQL 17 for schema/reporting/permission integration checks (CI execution results not yet independently verified).
 - Installation and configuration documentation updated for the `develop/v0.2` checkout.
 - `avm/mapping_review.py` persists pending proposals, independent reviewer decisions and approved-only identities; `avm/review_cli.py` manages them with a privileged CLI.
 - `avm/models.py` provides 3 review tables and 8 new `reporting.*` views; `avm/dashboards.py` provisions the seventh dashboard.
-- SQLite unit tests exercise approval and decision history; PostgreSQL/Metabase end-to-end validation is still pending.
+- SQLite unit tests exercise approval and decision history; a PostgreSQL integration test is included in CI. **Metabase end-to-end and real integration remain pending**.
 
 ## Current constraints
 
