@@ -1,4 +1,4 @@
-# v0.2 — Mapping Review Workflow and Data Quality
+# Mapping Review Workflow — retained from V2 in V3
 
 This review feature originated on develop/v0.2 and remains available on **develop/v0.3**, where the same approved-only mapping boundary feeds the risk/evidence engine. Nothing is merged into main.
 
@@ -34,9 +34,9 @@ The three new PostgreSQL tables are:
 
 The Metabase reporting account has **SELECT on reporting views**, not write access to these tables. Mapping decisions require privileged application DB access through the Worker container.
 
-## Set up v0.2
+## Set up on V3 (or V2)
 
-Use an isolated v0.2 Compose project and .env as described in [isolation instructions](V02-ISOLATION.md). Run the installation (`./install.sh --demo` for a synthetic evaluation, or `--live` after verifying both ManageEngine APIs). After the worker has initialized the database:
+On V3, use the one-command isolated setup in [V3 installation](INSTALLATION.md); the [V2 isolation guide](V02-ISOLATION.md) remains available for historic V2 users. Run the installation (`./install.sh --demo` for a synthetic evaluation, or `--live` after verifying both ManageEngine APIs). After the worker has initialized the database:
 
 ```bash
 # Read-only: inspect the review queue
@@ -94,7 +94,7 @@ Approved identities are picked up by the Worker **on its next inventory synchron
 - Changes use SQLAlchemy transactions, locking for individual reviews, uniqueness constraints for approved identities and consistent state transitions; concurrent approvals still require PostgreSQL integration testing.
 - Approval is not made available through Metabase or a public HTTP endpoint.
 - Changing an approved identity, revoking an approval, and a complete immutable external audit sink are **future features**; do not edit approval tables manually.
-- Back up the v0.2 PostgreSQL volume before upgrades. The tables are created by `Base.metadata.create_all`; no destructive migration is included.
+- Back up the current project's PostgreSQL volume before upgrades. The tables are created by `Base.metadata.create_all`; no destructive migration is included.
 - The current approval store is a **separate** set of trusted identities. If an equivalent YAML entry and DB approval conflict, ingestion fails closed instead of silently choosing one.
 
 ## Seventh Metabase dashboard
@@ -116,7 +116,7 @@ Approved identities are picked up by the Worker **on its next inventory synchron
 
 **Scope limitation:** *approved mapping coverage is not CVE/advisory coverage.* The separate `has_ingested_advisory_records` flag merely indicates at least one advisory record was ingested for that package; the feed is currently bounded to recent pages, and absence of a record is **not proof of safety**.
 
-A fresh bootstrap installs the seventh dashboard. On an existing v0.2 database, rerun the installer/bootstrap to create the new dashboard **after** upgrading the Worker schema. The provisioning logic is designed to avoid duplicating dashboards/cards by name, but an end-to-end Metabase test is pending.
+A fresh bootstrap installs the seventh dashboard. On an existing V2 or V3 database, rerun the installer/bootstrap to create the new dashboard **after** upgrading the Worker schema. The provisioning logic is designed to avoid duplicating dashboards/cards by name, but an end-to-end Metabase test is pending.
 
 ## Developer tests
 
