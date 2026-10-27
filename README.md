@@ -4,7 +4,7 @@
 
 Endpoint Central ➜ PostgreSQL ➜ conservative CVE correlation ➜ automatically provisioned Metabase dashboards, behind NGINX HTTPS.
 
-> **Status: v0.1 technical preview.** Demo fixtures and unit tests have been exercised, but a real Endpoint Central instance and Docker runtime were **not available** in the build environment. Production integrations must be validated against your actual build and the current cve.now response format before operational use.
+> **Status: v0.2 experimental development branch**, based on the v0.1 technical preview. New normalization and isolation logic has local unit-test coverage; live Endpoint Central and Docker coexistence have not yet been validated. Do not consider this production-certified.
 
 **v0.2 isolation:** use `COMPOSE_PROJECT_NAME=assetvuln-monitor-v02`, `HTTPS_PORT=8444`, and `PUBLIC_URL=https://localhost:8444` in this branch's `.env`. Never reuse v0.1 database volumes. See [v0.2 isolation guide](docs/V02-ISOLATION.md).
 
@@ -93,7 +93,7 @@ docker compose logs --tail=200 worker
 | `matching.mappings_file` | Keep `/opt/avm/config/product-mappings.yaml` |
 | `notifications.email_enabled` | `false` unless SMTP is configured |
 
-Put **only the least-privilege, read-only inventory API token** in `secrets/manageengine_token` — not in YAML or Git. If using an internal CA, copy its PEM into `secrets/certs/org-ca.pem` and set the container CA path above. Use `config/product-mappings.yaml` only for verified software identities.
+Put **only the least-privilege, read-only inventory API token** in `secrets/manageengine_token` — not in YAML or Git. If using an internal CA, copy its PEM into `secrets/certs/org-ca.pem` and set the container CA path above. The tracked `config/product-mappings.yaml` is **demo-only**; Live must use `config/product-mappings.live.yaml` with verified product identities.
 
 Copy `example.env` to a private `.env` before installation. It contains `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD`, database passwords, `BIND_IP`, `HTTPS_PORT`, and `PUBLIC_URL`. Set these before the first installation; replace demo TLS certificates with trusted ones. **Never commit `.env`, tokens or private keys.**
 
