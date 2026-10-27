@@ -129,4 +129,4 @@ docker compose logs --tail=200 worker
 
 Keep V1, V2 and V3 in **separate checkouts and Compose projects**; V3 defaults to assetvuln-monitor-v03, HTTPS 8445. Demo and Live cannot share the same installation/database. Never use docker compose down -v unless you intend to destroy that project's data and have verified backups.
 
-The V3 migrations are **additive**, non-destructive column additions, but PostgreSQL 17 upgrade/load behavior, API compatibility and Metabase provisioning against a real corporate setup remain staging validation requirements. See [security](SECURITY.md) and [troubleshooting](TROUBLESHOOTING.md).
+The V3 migrations are **additive**, non-destructive column additions, but PostgreSQL 17 upgrade/load behavior, API compatibility and Metabase provisioning against a real corporate setup remain staging validation requirements. A disposable one-command Docker/Metabase synthetic Demo passed in GitHub Actions run 40599590218; it does not establish real Live integration compatibility. See [security](SECURITY.md) and [troubleshooting](TROUBLESHOOTING.md).
