@@ -126,4 +126,4 @@ python3 -m pytest -q tests/test_mapping_review.py tests/test_review_cli.py \
 python3 -m compileall -q avm scripts tests
 ```
 
-The database workflow tests use in-memory/on-disk SQLite to validate state transitions, not to prove PostgreSQL permissions, migrations, locking, or full Docker-stack behavior. GitHub Actions performs unit tests and non-mutating Compose checks; deployment and real Endpoint Central validation are still outstanding.
+The unit workflow tests use in-memory/on-disk SQLite for state transitions. GitHub Actions also provisions a **throwaway PostgreSQL 17** service and runs `tests/test_postgres_mapping_review.py` against real PostgreSQL tables, SQL views, review state, and `avm_reader` privileges. This remains a CI integration test, **not** live Endpoint Central, full Metabase API, Docker coexistence, or production migration validation. Workflow execution status must be checked in GitHub Actions before claiming that it passed.
