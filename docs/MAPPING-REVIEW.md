@@ -1,6 +1,6 @@
 # v0.2 — Mapping Review Workflow and Data Quality
 
-This feature is available **only** in the `develop/v0.2` branch. Nothing is merged to `main`.
+This review feature originated on develop/v0.2 and remains available on **develop/v0.3**, where the same approved-only mapping boundary feeds the risk/evidence engine. Nothing is merged into main.
 
 ## Architecture and trust boundary
 
