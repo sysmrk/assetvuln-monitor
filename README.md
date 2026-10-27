@@ -39,9 +39,10 @@ Open **https://localhost:8443**. The localhost TLS certificate is self-signed fo
 
 ### LIVE — real inventory (separate clean deployment)
 
-**Never reuse a demo database for live assets:** demo data is not automatically removed. Use a fresh installation/volume.
+**Never reuse a demo database for live assets:** demo data is not automatically removed. Use a fresh Docker project/volume, ideally on a separate host. **A separate directory alone is not sufficient:** the Compose file sets a fixed project name, so the default named volume would otherwise be shared.
 
 ```bash
+# Recommended: execute on a fresh host with no existing AssetVuln Monitor Compose stack.
 cd /opt
 git clone https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-live
 cd assetvuln-monitor-live
