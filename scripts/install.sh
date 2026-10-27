@@ -88,6 +88,20 @@ if [[ "$mode" == live ]]; then
   fi
 fi
 
+# Keep synthetic demo mappings out of real inventory correlation.
+mapping_file="$(sed -n 's/^PRODUCT_MAPPINGS_FILE=//p' .env | tail -n 1)"
+mapping_file="${mapping_file%\"}"
+mapping_file="${mapping_file#\"}"
+if [[ "$mode" == live ]]; then
+  if [[ "$mapping_file" != "./config/product-mappings.live.yaml" ]]; then
+    echo 'ERROR: For Live, set PRODUCT_MAPPINGS_FILE=./config/product-mappings.live.yaml in .env.' >&2
+    exit 1
+  fi
+elif [[ -n "$mapping_file" && "$mapping_file" != "./config/product-mappings.yaml" ]]; then
+  echo 'ERROR: For Demo, set PRODUCT_MAPPINGS_FILE=./config/product-mappings.yaml in .env.' >&2
+  exit 1
+fi
+
 echo 'Checking Compose configuration...'
 docker compose config --quiet
 echo 'Building application and starting services...'
