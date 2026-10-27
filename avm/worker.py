@@ -159,9 +159,9 @@ def upsert_vulnerabilities(session, raw_entries):
     return processed
 
 
-def recalculate(session, allow_disappearance=False):
+def recalculate(session, allow_disappearance=False, sla_days=None):
     """Legacy public entrypoint; delegate to the versioned evidence lifecycle."""
-    return recalculate_findings(session, allow_disappearance=allow_disappearance)
+    return recalculate_findings(session, allow_disappearance=allow_disappearance, sla_days=sla_days)
 
 
 def record_run(session, source, fn):
@@ -284,7 +284,8 @@ def main():
                 try:
                     count = record_run(session, 'matching',
                                        lambda: recalculate(session,
-                                                           allow_disappearance=inventory_success))
+                                                           allow_disappearance=inventory_success,
+                                                           sla_days=cfg.get('risk', {}).get('sla_days')))
                     log.info('Active matches: %s', count)
                     notify(session, cfg, mode == 'demo')
                 except Exception:
