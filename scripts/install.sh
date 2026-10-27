@@ -96,6 +96,16 @@ except Exception:
   fi
 done
 chmod 600 .env secrets/manageengine_token config/application.yaml
+if [[ "$(id -u)" == 0 ]]; then
+  # Root-launched setup must not silently run the Worker as root.
+  worker_uid="$(sed -n 's/^HOST_UID=//p' .env | tail -n 1)"
+  worker_gid="$(sed -n 's/^HOST_GID=//p' .env | tail -n 1)"
+  if [[ "$worker_uid" == 0 || "$worker_gid" == 0 ]]; then
+    echo 'ERROR: Root-run installation requires a non-root HOST_UID/HOST_GID in .env.' >&2
+    exit 1
+  fi
+  chown "$worker_uid:$worker_gid" secrets/manageengine_token config/application.yaml
+fi
 if [[ ! -s secrets/tls/tls.key || ! -s secrets/tls/tls.crt ]]; then
   echo 'Generating temporary TLS certificate for localhost (browser warning is expected)...'
   openssl req -x509 -nodes -newkey rsa:3072 -sha256 -days 365 \
