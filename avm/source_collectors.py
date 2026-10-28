@@ -330,7 +330,7 @@ def sync_euvd(session, config=None, *, provider=None, clock=None):
         for item in rows:
             if not isinstance(item, dict) or not isinstance(item.get('id'), str):
                 raise ValueError('Malformed EUVD record')
-            aliases = ids_from_aliases(item.get('aliases') or '')
+            aliases = item.get('aliases') or ''
             note_advisory(session, source='euvd', source_id=item['id'],
                           aliases=aliases, title=item['id'],
                           summary=item.get('description'), cvss=item.get('baseScore'),
