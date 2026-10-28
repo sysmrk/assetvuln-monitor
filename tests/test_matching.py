@@ -33,3 +33,13 @@ def test_demo_synthetic_and_structured():
 def test_no_match_from_text_description():
     entry = {'id':'CVE-EXAMPLE','description':'Tomcat before 9.0.90 is vulnerable'}
     assert extract_affected(entry) == []
+
+
+
+def test_osv_exact_lookup_supports_vendor_specific_versions_without_guesswork():
+    query_evidence = {'osv_query': 'package_and_version',
+                      'versions': ['4.0.1-3.el9_7.2+vendor']}
+    assert is_affected('4.0.1-3.el9_7.2+vendor', query_evidence) is True
+    assert is_affected('4.0.1-3.el9_7.3+vendor', query_evidence) is False
+    # No explicit authoritative query: unsupported version is still unknown.
+    assert is_affected('4.0.1-3.el9_7.2+vendor', {'ranges': []}) is None
