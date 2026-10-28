@@ -122,6 +122,8 @@ def test_euvd_aliases_merge_into_single_cve_and_do_not_erase_nvd_cvss():
         obs = db.scalar(select(AdvisoryObservation))
         assert obs.source == 'euvd' and obs.source_id == 'EUVD-2026-12345'
         assert obs.vulnerability_id == 'CVE-2026-22222'
+        assert 'GHSA-aaaa-bbbb-cccc' in obs.aliases
+        assert 'CVE-2026-22222' in obs.aliases
         assert float(db.get(Vulnerability, obs.vulnerability_id).cvss) == 9.8
     engine.dispose()
 
