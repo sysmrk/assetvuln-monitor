@@ -36,6 +36,7 @@ services:
     environment:
       AVM_CONFIG: /opt/avm/config/application.yaml
       AVM_ASSET_CONTEXT: /opt/avm/config/asset-context.yaml
+      NVD_API_KEY: ${NVD_API_KEY:-}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set this variable in .env}
     volumes:
       - ./config/application.yaml:/opt/avm/config/application.yaml:ro
