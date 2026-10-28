@@ -136,8 +136,16 @@ def upsert_vulnerabilities(session, raw_entries):
             v.cvss = advisory_cvss
             if advisory_cvss is not None:
                 v.cvss_source = 'cve_now'
-        v.severity = str(entry.get('severity') or ('CRITICAL' if v.cvss and v.cvss >= 9 else
-                         'HIGH' if v.cvss and v.cvss >= 7 else 'MEDIUM' if v.cvss and v.cvss >= 4 else 'UNKNOWN')).upper()
+        # Severity must correspond to the selected authoritative CVSS,
+        # not an unrelated aggregator label after NVD/EUVD enrichment.
+        derived_severity = ('CRITICAL' if v.cvss is not None and v.cvss >= 9 else
+                            'HIGH' if v.cvss is not None and v.cvss >= 7 else
+                            'MEDIUM' if v.cvss is not None and v.cvss >= 4 else
+                            'LOW' if v.cvss is not None else 'UNKNOWN')
+        if v.cvss_source in ('nvd', 'euvd'):
+            v.severity = derived_severity
+        else:
+            v.severity = str(entry.get('severity') or derived_severity).upper()
         # Live KEV/EPSS rankings require separate official-feed provenance.
         # Keep synthetic demo indicators for tests, never treat advisory hints
         # as confirmed CISA/FIRST intelligence.
