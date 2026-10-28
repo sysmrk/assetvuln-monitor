@@ -36,6 +36,8 @@ def recalculate_findings(session, *, allow_disappearance=False, sla_days=None):
     stamp = now()
     packages = defaultdict(list)
     for affected in session.scalars(select(AffectedPackage)):
+        if affected.evidence_status not in (None, 'current'):
+            continue
         packages[(affected.ecosystem.casefold(), affected.package_name.casefold())].append(affected)
     software = {row.id: row for row in session.scalars(select(Software))}
     assets = {row.id: row for row in session.scalars(select(Asset))}
@@ -51,9 +53,12 @@ def recalculate_findings(session, *, allow_disappearance=False, sla_days=None):
             continue
         grouped = defaultdict(list)
         for affected in packages.get((product.ecosystem.casefold(), product.package_name.casefold()), []):
+            if affected.matched_version is not None and affected.matched_version != installed.version:
+                continue
             if is_affected(installed.version, affected.affected_spec) is True:
-                grouped[affected.vulnerability_id].append(affected.affected_spec)
-        for cve_id, specs in grouped.items():
+                grouped[affected.vulnerability_id].append(affected)
+        for cve_id, matched_evidence in grouped.items():
+            specs = [row.affected_spec for row in matched_evidence]
             vulnerability = vulnerabilities.get(cve_id)
             if vulnerability is None:
                 continue
@@ -95,6 +100,18 @@ def recalculate_findings(session, *, allow_disappearance=False, sla_days=None):
             record.confidence = 'potential-structured-range'
             record.evidence = ('Approved package identity and structured affected-version range; '
                                'requires vendor/backport verification.')
+            evidence['reporting_sources'] = sorted(set(
+                row.source or 'cve_now' for row in matched_evidence))
+            evidence['source_evidence'] = [
+                {'source': row.source or 'cve_now',
+                 'source_id': row.source_id or row.vulnerability_id,
+                 'match_method': ('osv_package_version_lookup'
+                                  if row.source == 'osv' else 'structured_affected_range'),
+                 'matched_version': row.matched_version}
+                for row in matched_evidence][:30]
+            evidence['source_agreement'] = (
+                'multiple_reporting_paths_not_independent'
+                if len(evidence['reporting_sources']) > 1 else 'single_reporting_path')
             record.evidence_packet = evidence
             record.remediation = remediation_plan(evidence=evidence,
                                                   kev_action=vulnerability.kev_action)
@@ -111,13 +128,24 @@ def recalculate_findings(session, *, allow_disappearance=False, sla_days=None):
     for key, finding in existing.items():
         if key in observed:
             continue
-        if allow_disappearance and finding.active:
+        installed = session.get(Installation, finding.installation_id)
+        asset = assets.get(installed.asset_id) if installed else None
+        # A feed correction/retraction alone cannot prove patching. An
+        # existing installation must actually disappear before not_observed.
+        observed_installation_gone = (
+            installed is None or not installed.active or asset is None or not asset.active)
+        if allow_disappearance and finding.active and observed_installation_gone:
             finding.active = False
             finding.workflow_state = 'not_observed'
             finding.state_updated_at = stamp
             _event(session, finding, 'not_observed',
-                   'No matching active installation in a completed inventory; not proof of remediation')
+                   'Installation absent from completed inventory; no proof of remediation')
         elif finding.active:
+            if allow_disappearance and finding.workflow_state not in ('needs_review', 'accepted'):
+                finding.workflow_state = 'needs_review'
+                finding.state_updated_at = stamp
+                _event(session, finding, 'source_evidence_missing',
+                       'Previously matched version still installed but no current source match; manual review required')
             vulnerability = vulnerabilities.get(finding.vulnerability_id)
             installed = session.get(Installation, finding.installation_id)
             asset = assets.get(installed.asset_id) if installed else None
