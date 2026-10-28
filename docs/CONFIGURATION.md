@@ -42,17 +42,21 @@ Do not commit actual .env, certificates, credentials, asset-context configuratio
 | cve.url | Default https://cve.now |
 | cve.sync_minutes | Default 30 |
 | cve.max_pages_per_poll | Default 5; intentionally bounded, not a CVE historical backfill |
-| threat_intelligence.enabled | Default true; only Live uses the public feeds |
-| threat_intelligence.sync_hours | Default 24; automatic GET-only refresh |
+| threat_intelligence.enabled | Default true; only Live uses CISA KEV and FIRST daily EPSS CSV |
+| threat_intelligence.sync_hours | Default 24; automatic KEV GET and FIRST daily CSV refresh |
+| vulnerability_sources.osv.enabled | Default true in Live: OSV read-only POST QueryBatch and 24-hour per-version cache |
+| vulnerability_sources.nvd.enabled | Default true in Live: bounded NVD modified-date GET API delta |
+| vulnerability_sources.euvd.enabled | Default true in Live: paginated ENISA EUVD advisory GET |
+| NVD_API_KEY (.env) | Optional only; no other source credential is mandatory |
 | risk.sla_days | Optional P1/P2/P3/P4 SLA targets in days (defaults 7/30/90/180) |
 | matching.mappings_file | Worker path to mounted mapping YAML |
 | notifications.email_enabled | Default false; optional SMTP configuration must be independently verified |
 
-No additional API keys are required for CISA KEV or FIRST EPSS. The Worker uses fixed HTTPS origins:
+No additional API keys are required for CISA KEV, FIRST EPSS, OSV or EUVD. NVD_API_KEY is optional. The Worker uses fixed HTTPS origins:
 - CISA KEV: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
 - FIRST EPSS: https://api.first.org/data/v1/epss
 
-The FIRST API is designed for small lookup batches of already-known CVEs; it is **not** treated as a bulk daily mirror. Existing EPSS/KEV values are kept if the refresh fails. The retrieval timestamp indicates when AVM checked the source, not a guarantee of publication freshness.
+The FIRST **daily CSV** is streamed and validated for bulk updates of known local CVEs; its API is no longer used for mass lookup. Existing EPSS/KEV values are kept if refresh fails. The retrieval timestamp indicates when AVM checked the source, not a guarantee of publication freshness.
 
 ## Explicit asset context (optional)
 
@@ -103,4 +107,4 @@ docker compose restart worker
 
 Asset-context values are applied at the next inventory sync. New mapping approvals also take effect on that sync. A restart alone does not force source collection if the Worker is already processing; inspect logs for recorded collection completion.
 
-More details: [V3 operations](V03-OPERATIONS.md), [installation](INSTALLATION.md), [security](SECURITY.md).
+More details: [Multi-source design](V03-MULTISOURCE.md), [V3 operations](V03-OPERATIONS.md), [installation](INSTALLATION.md), [security](SECURITY.md).
