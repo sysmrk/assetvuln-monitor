@@ -139,7 +139,7 @@ def recalculate_findings(session, *, allow_disappearance=False, sla_days=None):
             finding.workflow_state = 'not_observed'
             finding.state_updated_at = stamp
             _event(session, finding, 'not_observed',
-                   'Installation absent from completed inventory; no proof of remediation')
+                   'Installation absent from completed inventory; not proof of remediation')
         elif finding.active:
             if allow_disappearance and finding.workflow_state not in ('needs_review', 'accepted'):
                 finding.workflow_state = 'needs_review'
