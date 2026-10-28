@@ -202,11 +202,11 @@ These **do not patch hosts or close Findings**; they only calculate hypothetical
 docker compose exec -T worker python -m avm.ops accept \
   --finding-id 12 \
   --actor "risk-owner" \
-  --until 2026-12-01 \
+  --until "$(date -u -d '+30 days' +%F)" \
   --reason "Approved temporary business exception; compensating controls documented"
 ~~~
 
-Replace **12**, the actor and expiry with values appropriate to your organization. The expiry must be **1 to 180 days from the day you run it**. If this example date is in the past, it will fail, as it should. Approval is **not validated by SSO**; restrict who can run it.
+Replace **12**, the actor and expiry with values appropriate to your organization. The expiry must be **1 to 180 days from the day you run it**. The example computes a date 30 days from the current UTC day on Ubuntu/Linux using GNU date. Approval is **not validated by SSO**; restrict who can run it.
 
 **Release an acceptance** (writes to local AVM DB):
 
