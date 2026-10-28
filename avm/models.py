@@ -88,6 +88,7 @@ class AffectedPackage(Base):
     source = Column(String(24), nullable=False, default='cve_now')
     source_id = Column(String(100))
     matched_version = Column(String(150))
+    evidence_status = Column(String(20), nullable=False, default='current')
 
 
 class Finding(Base):
@@ -263,7 +264,7 @@ V3_ADDITIVE_COLUMNS = {
                         'intel_checked_at timestamptz', 'cvss_source varchar(24)',
                         'epss_percentile numeric(8,6)', 'epss_date varchar(10)'),
     'affected_packages': ("source varchar(24) NOT NULL DEFAULT 'cve_now'",
-                          "source_id varchar(100)", "matched_version varchar(150)"),
+                          "source_id varchar(100)", "matched_version varchar(150)", "evidence_status varchar(20) NOT NULL DEFAULT 'current'"),
     'findings': ('risk_score numeric(5,2)', 'priority varchar(3)',
                  'risk_factors json', 'evidence_packet json', 'remediation json',
                  "workflow_state varchar(24) NOT NULL DEFAULT 'open'",
