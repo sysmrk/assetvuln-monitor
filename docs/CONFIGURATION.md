@@ -1,53 +1,209 @@
-# Configuration reference
+# V2 configuration — every file explained
 
-Runtime configuration uses **both** `.env` (Compose credentials, bind settings and build index) and `config/application.yaml` (application behavior). It is created from the heavily commented `config/application.example.yaml` during install.
+**This is the historical V2 implementation.** It has **seven** Metabase dashboards, uses Endpoint Central + cve.now and requires **manual .env password setup**. For the simpler future product, read [V3 configuration](https://github.com/sysmrk/assetvuln-monitor/blob/develop/v0.3/docs/CONFIGURATION.md).
 
-- `application.mode`: `demo` or `live`; use `demo` in WSL without ManageEngine.
-- `manageengine.url`: HTTPS base URL (example `https://ec.example.org:8383`). Do **not** add an `/api` suffix.
-- `manageengine.token_file`: default `/run/secrets/manageengine_token`; this is read-only inside the container.
-- `manageengine.verify_tls`: must stay `true` in live mode.
-- `manageengine.ca_bundle`: optional container path to CA file mounted from `secrets/certs`.
-- `manageengine.sync_minutes`: inventory refresh cadence, default 360 minutes.
-- `cve.url`: default `https://cve.now`.
-- `cve.sync_minutes`: advisory polling interval, default 30 minutes.
-- `cve.max_pages_per_poll`: bounded number of latest CVE pages. **Not** a guarantee of historical coverage.
-- `matching.mappings_file`: explicit package identity mapping file mounted into the worker.
-- `notifications.email_enabled`: default `false` (never sends in demo mode). SMTP only supports STARTTLS; add SMTP_USER and SMTP_PASSWORD environment variables for optional authentication.
+[Install V2 step by step](INSTALLATION.md) · [V1/V2 isolation](V02-ISOLATION.md) · [Mapping approvals](MAPPING-REVIEW.md)
 
-Before installing, run `cp example.env .env` and edit `.env`: replace all `CHANGE_ME_*` placeholders with unique strong secrets, set `HOST_UID`/`HOST_GID` from `id -u` / `id -g`, and adjust `PUBLIC_URL`, `BIND_IP`, `HTTPS_PORT` as needed. Installer requires `.env`, protects it with mode `0600`, and never overwrites it. `PIP_INDEX_URL` optionally selects the Python package index used during Docker image builds; use a trusted index. `.env` is intentionally excluded from Git. Install proper TLS files in `secrets/tls` before a network-facing deployment.
+## Which files must I change?
 
-## Version mapping
+| File | Used for | Demo | Live |
+|---|---|---|---|
+| **.env** | Passwords, Docker project and HTTPS | **Create and fill** | **Create and fill** |
+| **config/application.yaml** | Worker mode, Endpoint Central URL, source settings | Installer creates it | Set Live URL and mode |
+| **secrets/manageengine_token** | Inventory-only Endpoint Central token | Empty | Add read-only token |
+| **config/product-mappings.yaml** | Fictional Demo mappings | Use only for Demo | **Never use for Live** |
+| **config/product-mappings.live.yaml** | Verified real package mappings | Not used | Starts empty; approve identities |
+| **secrets/certs/** | Organization CA PEM | Usually not needed | If Endpoint Central uses private CA |
+| **secrets/tls/** | NGINX TLS certificate and key | Local self-signed generated | Replace for trusted network access |
 
-When an inventory entry identifies a package with a verified ecosystem (e.g. PyPI, npm), define exact vendor+name mapping in `config/product-mappings.yaml`. Do not map general software names to unrelated package versions just to increase matches. The conservative engine does **not** currently implement generic CPE-range logic, vendor backport verification, or a full SBOM parser.
+All commands assume you are in the root of the **correct V2 checkout**:
 
-## Credentials
+~~~bash
+git branch --show-current
+~~~
 
-In production, create a least-privilege Endpoint Central account/token with only the inventory read scope. Store it in `secrets/manageengine_token` (permission `0600`). Never paste passwords into GitHub issues, screenshots or logs.
+Expected: **develop/v0.2**.
 
-## Software identity mappings
+## 1. Create and protect .env
 
-**Demo** uses `config/product-mappings.yaml`: two deliberately synthetic identities matching `avm/demo.py`. **Live** must use `config/product-mappings.live.yaml` by setting `PRODUCT_MAPPINGS_FILE=./config/product-mappings.live.yaml` in `.env`. This file starts with `products: []` so that real assets are inventoried but not assigned unverified CVE findings.
+~~~bash
+cp example.env .env
+nano .env
+~~~
 
-Each mapping has four fields: `vendor` and `name` (exact, case-insensitive match against ManageEngine software inventory), and `ecosystem` and `package` (verified identity in the structured CVE advisory). Example **format only**:
+V2 **does not generate passwords for you**. Replace each **CHANGE_ME_*** value with a separate random value:
 
-```yaml
-products:
-  - vendor: "Verified Vendor From Inventory"
-    name: "Verified Product From Inventory"
-    ecosystem: "PyPI"
-    package: "verified-package-from-advisory"
-```
+~~~bash
+openssl rand -hex 30
+~~~
 
-Do not map unrelated products based on name similarity. A missing mapping does not hide the software from inventory; it prevents unsupported version-based CVE correlation. Vendor patches and backports still require manual verification.
+Run that five times, once for each password: **POSTGRES_PASSWORD**, **APP_DB_PASSWORD**, **REPORT_DB_PASSWORD**, **MB_DB_PASSWORD**, **METABASE_ADMIN_PASSWORD**.
 
-## Independent ManageEngine API test
+Set **HOST_UID** and **HOST_GID** to the numeric values printed by:
 
-Before `./install.sh --live`, run `python3 scripts/test_manageengine_api.py` after configuring the HTTPS URL and read-only token. It lists both GET endpoints and checks their initial JSON responses, with PASS/FAIL/SKIP results. Options include `--resource-id 12345` and `--ca-bundle secrets/certs/org-ca.pem`. No Docker or database required; no secrets printed. This is a smoke test, not exhaustive API compatibility validation.
+~~~bash
+id -u
+id -g
+~~~
 
-## v0.2 mapping review and normalization
+**Demo** example values:
 
-In the `develop/v0.2` branch, the runtime worker matches only **operator-approved** YAML identities, now comparing software vendor/name with Unicode NFKC, case folding and collapsed whitespace. Duplicate approved identities are rejected instead of silently overwritten. The offline `scripts/suggest_mappings.py` produces candidate suggestions and coverage metrics from a CSV export, but **never modifies the YAML, database or findings**. All similar-name suggestions require manual verification. See [normalization guide](SOFTWARE-NORMALIZATION.md).
+~~~dotenv
+COMPOSE_PROJECT_NAME=assetvuln-monitor-v02
+BIND_IP=127.0.0.1
+HTTPS_PORT=8444
+PUBLIC_URL=https://localhost:8444
+PRODUCT_MAPPINGS_FILE=./config/product-mappings.yaml
+~~~
 
-## v0.2 database-backed mapping review
+**Live** must use a different project/port and the empty Live mapping file:
 
-The worker now saves similar-name identity candidates into `mapping_reviews` as `pending` **only after a successful, committed inventory sync**. Operators can create explicit pending proposals and review them with `docker compose exec worker python -m avm.review_cli ...`. The approval record is stored in `approved_software_mappings`; an application-level append-only decision history is stored in `mapping_decisions`. Approved DB identities are merged with the verified Live YAML and used in the next inventory sync. Unknown candidates cannot affect findings. Review account identifiers are caller-supplied and require trusted container/DB access; there is no SSO or tamper-proof audit yet. See [Mapping Review workflow](MAPPING-REVIEW.md) and dashboard 07.
+~~~dotenv
+COMPOSE_PROJECT_NAME=assetvuln-monitor-v02-live
+BIND_IP=127.0.0.1
+HTTPS_PORT=8454
+PUBLIC_URL=https://localhost:8454
+PRODUCT_MAPPINGS_FILE=./config/product-mappings.live.yaml
+~~~
+
+Save with **Ctrl+O**, Enter, **Ctrl+X**, then:
+
+~~~bash
+chmod 600 .env
+~~~
+
+**Do not edit existing PostgreSQL passwords after DB initialization** expecting a rotation: the PostgreSQL init script does not rerun on a populated volume. Never commit .env.
+
+## 2. Configure the Worker
+
+If the file is absent:
+
+~~~bash
+cp config/application.example.yaml config/application.yaml
+nano config/application.yaml
+~~~
+
+**Demo:**
+
+~~~yaml
+application:
+  mode: demo
+~~~
+
+**Live:** set **mode: live**, then the actual HTTPS base URL under **manageengine**:
+
+~~~yaml
+application:
+  mode: live
+
+manageengine:
+  url: "https://endpoint.your-company.example:8383"
+  token_file: /run/secrets/manageengine_token
+  verify_tls: true
+  ca_bundle: ""
+  sync_minutes: 360
+  max_assets: 10000
+  max_pages: 500
+~~~
+
+Do **not** delete other sections of the example YAML while editing. The Endpoint Central URL should be the **base URL** only, with no /dcapi suffix.
+
+| Setting | Meaning |
+|---|---|
+| **application.mode** | demo = synthetic; live = actual Endpoint Central + cve.now |
+| **manageengine.url** | Real HTTPS base URL (on-premises API) |
+| **manageengine.token_file** | In-container token path; keep default |
+| **manageengine.verify_tls** | Must remain true |
+| **manageengine.ca_bundle** | In-container CA path if internal PKI |
+| **manageengine.sync_minutes** | Default 360 (six hours) |
+| **manageengine.max_assets** | Hard default cap 10,000; increase before larger authorized inventories |
+| **manageengine.max_pages** | Pagination cap; rejects incomplete scans |
+| **cve.url** | https://cve.now |
+| **cve.sync_minutes** | Default 30 |
+| **cve.max_pages_per_poll** | Default 5 most recent pages; **not a full CVE archive** |
+| **matching.mappings_file** | Internal path for mounted approved mapping YAML; usually leave default |
+| **notifications.email_enabled** | Off by default; separately validate SMTP if enabling |
+
+YAML indentation uses **spaces**, not tabs. The timezone field exists but is not a substitute for confirming timestamps and freshness in dashboards.
+
+## 3. Add the Live inventory token
+
+~~~bash
+mkdir -p secrets/certs
+nano secrets/manageengine_token
+chmod 600 secrets/manageengine_token
+~~~
+
+Use an account with **inventory-read permission only**. Never paste the token into a GitHub issue, commit or configuration example.
+
+If you have a private company CA, copy the trusted PEM into **secrets/certs/org-ca.pem** and set:
+
+~~~yaml
+ca_bundle: "/opt/avm/certs/org-ca.pem"
+~~~
+
+Then test using its **host path**:
+
+~~~bash
+python3 scripts/test_manageengine_api.py --ca-bundle secrets/certs/org-ca.pem
+~~~
+
+Otherwise:
+
+~~~bash
+python3 scripts/test_manageengine_api.py
+~~~
+
+**Expected:** both inventory and software API tests return PASS. Both test calls are **GET-only**.
+
+## 4. Approved software identities: why Live starts empty
+
+**config/product-mappings.yaml** is a tracked, fictional Demo file. **Do not use it for company data.**
+
+**config/product-mappings.live.yaml** starts at:
+
+~~~yaml
+products: []
+~~~
+
+This means observed software still appears, but the Worker **does not guess** matching advisory package IDs. To create real version-based correlations:
+
+1. Find exact vendor and product in **03 · Software Catalog**.
+2. Verify its **ecosystem** (PyPI/npm/etc.) and **package name** in an official source.
+3. Create a pending mapping proposal using **avm.review_cli propose**.
+4. Have a different reviewer approve it with evidence.
+5. Wait for the next full inventory sync and verify the result.
+
+See [the complete commands](MAPPING-REVIEW.md). Fuzzy similarity suggestions are never automatically promoted.
+
+V2's optional **scripts/suggest_mappings.py** reads local CSV data and reports **review-only candidates**; it does not modify approvals or change Endpoint Central.
+
+## 5. How to apply settings safely
+
+~~~bash
+docker compose config --quiet
+docker compose ps
+~~~
+
+After editing application YAML, on an appropriately sized staging deployment:
+
+~~~bash
+docker compose restart worker
+docker compose logs --tail=100 worker
+~~~
+
+Restarting triggers another read-only Endpoint Central inventory collection; for large fleets, prefer the normal six-hour schedule. Do not change project identity or database credentials on a populated installation without a tested migration/rotation plan.
+
+To change only NGINX port, update both **HTTPS_PORT** and **PUBLIC_URL** in .env, then run:
+
+~~~bash
+docker compose up -d nginx
+~~~
+
+**Keep BIND_IP=127.0.0.1 for initial tests.** The installer-generated localhost TLS certificate is not a production shared-network certificate.
+
+## 6. What V2 does not configure
+
+V2 does **not** include OSV QueryBatch, NVD/EUVD collectors, official FIRST EPSS CSV, CISA daily verified enrichment, the ninth source dashboard or the V3 risk engine. Do not copy V3-only YAML sections or CLI commands into this checkout.
+
+For those capabilities, use [V3](https://github.com/sysmrk/assetvuln-monitor/tree/develop/v0.3), always as a separate project. Both branches are development previews; neither validates your production Endpoint Central infrastructure automatically.
