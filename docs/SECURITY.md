@@ -25,7 +25,7 @@ AssetVuln Monitor is **read-only toward managed Endpoint Central assets**. Exter
 
 ## Public sources and failure behavior
 
-- The Live Worker checks CISA KEV and FIRST EPSS once per day (configurable). All requests are fixed-origin HTTPS GET, with redirects refused and bounded FIRST CVE lookup batches.
+- The Live Worker checks CISA KEV and FIRST EPSS once per day (configurable). CISA requests are fixed-origin HTTPS GET; FIRST EPSS uses the official daily compressed CSV download. OSV uses a fixed public HTTPS POST QueryBatch for read-only lookups, while Endpoint Central remains GET-only.
 - An invalid/incomplete CISA feed or failed FIRST EPSS request prevents updating that intelligence cycle and preserves the last good signals. The next attempt occurs on a limited retry schedule.
 - Demo never contacts real Endpoint Central, CISA or FIRST. Synthetic CVEs are identified as CVE-DEMO-*.
 - The cve.now feed reader is limited to a configurable recent-page window, **not historical completeness**. An absent CVE match cannot establish absence of risk.
@@ -50,4 +50,4 @@ AssetVuln Monitor is **read-only toward managed Endpoint Central assets**. Exter
 7. Control inventory and report sensitivity; Metabase viewers may see hostnames, installed software, owners and proposed vulnerabilities.
 8. Verify pinned container image digests, supply-chain integrity and current CVEs of the runtime itself.
 
-See [one-command installation](INSTALLATION.md), [V3 operations](V03-OPERATIONS.md) and [mapping governance](MAPPING-REVIEW.md).
+See [one-command installation](INSTALLATION.md), [V3 operations](V03-OPERATIONS.md) , [mapping governance](MAPPING-REVIEW.md) and [source provenance](V03-MULTISOURCE.md).
