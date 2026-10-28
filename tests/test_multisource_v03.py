@@ -147,3 +147,20 @@ def test_many_assets_still_generate_only_one_osv_tuple():
         db.flush()
         assert len(approved_unique_packages(db)) == 1
     engine.dispose()
+
+
+
+def test_demo_sources_are_synthetic_and_offline():
+    from avm.demo import seed_multisource_demo, vulnerabilities
+    from avm.worker import upsert_vulnerabilities
+    engine = create_engine('sqlite+pysqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        upsert_vulnerabilities(db, vulnerabilities())
+        seed_multisource_demo(db)
+        db.flush()
+        observed = {r.source for r in db.scalars(select(AdvisoryObservation))}
+        assert observed == {'cve_now', 'osv', 'nvd', 'euvd'}
+        assert db.get(Vulnerability, 'CVE-DEMO-0001').synthetic is True
+        assert db.get(Vulnerability, 'CVE-DEMO-0001').cvss_source is None
+    engine.dispose()
