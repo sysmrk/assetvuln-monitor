@@ -51,3 +51,29 @@ def vulnerabilities():
          'publishedAt':now,'synthetic':True,
          'affected':[{'package':{'ecosystem':'PyPI','name':'demo-web-framework'},
                       'versions':['0.4.0']}]}]
+
+
+
+def seed_multisource_demo(session):
+    """Locally simulate source provenance; never call public APIs in Demo mode."""
+    from avm.source_engine import note_advisory, mark_query_evidence
+
+    note_advisory(session, source='cve_now', source_id='CVE-DEMO-0001',
+                  title='Synthetic cve.now advisory', synthetic=True,
+                  raw={'demo_only': True})
+    note_advisory(session, source='nvd', source_id='CVE-DEMO-0001',
+                  title='Synthetic NVD metadata', cvss=9.1, synthetic=True,
+                  raw={'demo_only': True})
+    note_advisory(session, source='euvd', source_id='CVE-DEMO-0001',
+                  title='Synthetic EUVD metadata', cvss=9.1, synthetic=True,
+                  raw={'demo_only': True})
+    mark_query_evidence(session, ecosystem='pypi', package_name='demo-web-framework',
+                        version='1.4.0', source_records=[{
+                            'id':'CVE-DEMO-0001', 'modified':'2026-01-01T00:00:00Z',
+                            'summary':'DEMO ONLY: synthetic OSV match',
+                            'affected':[{
+                                'package':{'ecosystem':'PyPI','name':'demo-web-framework'},
+                                'ranges':[{'type':'SEMVER','events':[{'introduced':'0'},
+                                                                    {'fixed':'1.5.0'}]}]
+                            }]
+                        }])
