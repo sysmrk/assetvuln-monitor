@@ -36,7 +36,30 @@ cve:
   max_pages_per_poll: 5           # Bounded collection; NOT full CVE history.
   request_timeout_seconds: 30
 
-# Live mode only; no API keys. GET-only public feeds, refreshed daily.
+# Public sources: automatically active in LIVE, never call Endpoint Central again.
+# All metadata is stored in PostgreSQL; there is no Redis/Kafka requirement.
+# OSV sends only mapped package/version, not hostnames or asset identifiers.
+vulnerability_sources:
+  osv:
+    enabled: true
+    sync_minutes: 20
+    batch_size: 50                # Unique mapped package/version tuples, not assets.
+    max_batches_per_cycle: 4
+    cache_hours: 24               # Both positive and negative queries are refreshed.
+  nvd:
+    enabled: true
+    sync_minutes: 120             # API 2.0 delta; no key needed at low request rates.
+    max_pages_per_cycle: 2        # Keep source load bounded.
+    page_size: 300
+    pending_sync_minutes: 10     # Resume large windows without skipping pages.
+  euvd:
+    enabled: true
+    sync_minutes: 240
+    max_pages_per_cycle: 3
+    page_size: 100
+    pending_sync_minutes: 10
+
+# Live only: official CISA KEV plus the full FIRST daily CSV (not bulk API lookup).
 threat_intelligence:
   enabled: true
   sync_hours: 24
