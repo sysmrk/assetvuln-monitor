@@ -90,6 +90,7 @@ def main(argv=None):
                         'finding_id': finding.id, 'asset': asset.hostname, 'cve': vuln.id,
                         'risk_score': float(finding.risk_score) if finding.risk_score is not None else None,
                         'priority': finding.priority,
+                        'reporting_sources': (finding.evidence_packet or {}).get('reporting_sources', []),
                         'state': finding.workflow_state,
                         'accepted_until': finding.accepted_until.isoformat()
                         if finding.accepted_until else None,
