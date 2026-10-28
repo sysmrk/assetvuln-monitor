@@ -163,6 +163,10 @@ DASHBOARDS = {
         ('Feed Health and Last Successful Sync', 'table',
          'SELECT source, last_success, last_failure, successes, failures '
          'FROM reporting.source_sync_health ORDER BY source', 12),
+        ('Incremental Feed Cursor and Backlog', 'table',
+         'SELECT source, has_pending_pages, pending_window_start, pending_window_end, '
+         'next_page_or_offset, last_complete_window_end, updated_at '
+         'FROM reporting.source_cursor_status ORDER BY source', 24),
         ('Source Metadata Coverage', 'table',
          'SELECT source, advisory_count, withdrawn, scored, last_fetched_at '
          'FROM reporting.source_coverage ORDER BY source', 24),
