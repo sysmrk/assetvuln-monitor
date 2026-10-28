@@ -147,4 +147,41 @@ DASHBOARDS = {
          'SELECT active_assets, unknown_criticality, unknown_exposure, unassigned_owner '
          'FROM reporting.asset_context_quality', 24),
     ],
+    '09 · Source Intelligence & Coverage': [
+        ('Unique OSV Package Versions Checked', 'scalar',
+         'SELECT checked_unique_package_versions FROM reporting.osv_cache_coverage', 6),
+        ('OSV Versions With Advisory Results', 'scalar',
+         'SELECT with_osv_advisories FROM reporting.osv_cache_coverage', 6),
+        ('Unique Source Advisory Records', 'scalar',
+         'SELECT count(*) FROM reporting.source_advisories', 6),
+        ('Multi-Source Matched Findings', 'scalar',
+         'SELECT count(*) FROM reporting.finding_source_details '
+         'WHERE active AND reporting_path_count > 1', 6),
+        ('Advisories by Source', 'bar',
+         'SELECT source, advisory_count FROM reporting.source_coverage '
+         'ORDER BY advisory_count DESC', 12),
+        ('Feed Health and Last Successful Sync', 'table',
+         'SELECT source, last_success, last_failure, successes, failures '
+         'FROM reporting.source_sync_health ORDER BY source', 12),
+        ('Source Metadata Coverage', 'table',
+         'SELECT source, advisory_count, withdrawn, scored, last_fetched_at '
+         'FROM reporting.source_coverage ORDER BY source', 24),
+        ('Finding Source Attribution', 'table',
+         'SELECT finding_id, canonical_id, hostname, software, version, priority, '
+         'risk_score, reporting_sources, reporting_path_count, workflow_state, '
+         'last_detected FROM reporting.finding_source_details '
+         'WHERE active ORDER BY risk_score DESC NULLS LAST LIMIT 2000', 24),
+        ('Per-Source Advisory and CVSS Provenance', 'table',
+         'SELECT source, source_id, canonical_id, original_source, aliases, '
+         'status, source_cvss, selected_cvss, selected_cvss_source, '
+         'updated_at, fetched_at FROM reporting.source_advisories '
+         'ORDER BY fetched_at DESC LIMIT 2000', 24),
+        ('Package and Version Evidence by Source', 'table',
+         'SELECT canonical_id, source, source_id, ecosystem, package_name, '
+         'matched_version, evidence_status, affected_spec '
+         'FROM reporting.source_evidence ORDER BY canonical_id LIMIT 2000', 24),
+        ('OSV Cache Last Refreshed', 'table',
+         'SELECT checked_unique_package_versions, with_osv_advisories, last_checked_at '
+         'FROM reporting.osv_cache_coverage', 24),
+    ],
 }
