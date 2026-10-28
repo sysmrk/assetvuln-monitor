@@ -157,6 +157,8 @@ DASHBOARDS = {
         ('Multi-Source Matched Findings', 'scalar',
          'SELECT count(*) FROM reporting.finding_source_details '
          'WHERE active AND reporting_path_count > 1', 6),
+        ('Explicit Source Range Disagreements', 'scalar',
+         'SELECT count(*) FROM reporting.source_conflicts', 6),
         ('Advisories by Source', 'bar',
          'SELECT source, advisory_count FROM reporting.source_coverage '
          'ORDER BY advisory_count DESC', 12),
@@ -184,6 +186,11 @@ DASHBOARDS = {
          'SELECT canonical_id, source, source_id, ecosystem, package_name, '
          'matched_version, evidence_status, affected_spec '
          'FROM reporting.source_evidence ORDER BY canonical_id LIMIT 2000', 24),
+        ('Source Range Disagreements Requiring Review', 'table',
+         'SELECT finding_id, canonical_id, hostname, software, version, '
+         'priority, risk_score, reporting_sources, source_conflict '
+         'FROM reporting.source_conflicts '
+         'ORDER BY risk_score DESC NULLS LAST LIMIT 2000', 24),
         ('Retracted OSV Evidence Requiring Review', 'table',
          'SELECT canonical_id, source_id, ecosystem, package_name, matched_version, '
          'affected_active_assets FROM reporting.source_retractions '
