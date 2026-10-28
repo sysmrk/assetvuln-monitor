@@ -315,10 +315,17 @@ def main():
                         run_match = run_match or count > 0
                     except Exception:
                         log.exception('%s refresh failed; existing source metadata retained', name)
+                    # Large update windows resume from persisted page cursors
+                    # on a short interval, without skipping unseen advisories.
+                    from avm.models import FeedCheckpoint
+                    checkpoint = session.get(FeedCheckpoint, name)
+                    pending_pages = bool(checkpoint and (checkpoint.state or {}).get('start'))
+                    next_interval = max(1, int(options.get('pending_sync_minutes', 10))) * 60
+                    elapsed_adjustment = cadence - next_interval if pending_pages else 0
                     if name == 'nvd':
-                        last_nvd = current
+                        last_nvd = current - elapsed_adjustment
                     else:
-                        last_euvd = current
+                        last_euvd = current - elapsed_adjustment
 
                 intel_cfg = cfg.get('threat_intelligence', {})
                 intel_interval = max(1, int(intel_cfg.get('sync_hours', 24))) * 3600
