@@ -20,6 +20,9 @@ from avm.mapping_review import approved_runtime_lookup, refresh_review_queue
 from avm.asset_context import load_asset_context, apply_asset_context
 from avm.lifecycle import recalculate_findings
 from avm.threat_intel import PublicThreatIntel, enrich_vulnerabilities
+from avm.source_engine import note_advisory
+from avm.source_collectors import sync_osv, sync_nvd, sync_euvd
+from avm.epss_csv import sync_epss_csv
 
 logging.basicConfig(level=os.environ.get('LOG_LEVEL','INFO'),
                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
@@ -123,11 +126,16 @@ def upsert_vulnerabilities(session, raw_entries):
         if isinstance(score, dict):
             score = score.get('score') or score.get('baseScore')
         try:
-            v.cvss = float(score) if score is not None else None
+            advisory_cvss = float(score) if score is not None else None
         except (ValueError, TypeError):
-            v.cvss = None
-        if v.cvss is not None and (v.cvss < 0 or v.cvss > 10):
-            v.cvss = None
+            advisory_cvss = None
+        if advisory_cvss is not None and not 0 <= advisory_cvss <= 10:
+            advisory_cvss = None
+        # NVD/EUVD CVSS values retain their own provenance and priority.
+        if v.cvss_source not in ('nvd', 'euvd'):
+            v.cvss = advisory_cvss
+            if advisory_cvss is not None:
+                v.cvss_source = 'cve_now'
         v.severity = str(entry.get('severity') or ('CRITICAL' if v.cvss and v.cvss >= 9 else
                          'HIGH' if v.cvss and v.cvss >= 7 else 'MEDIUM' if v.cvss and v.cvss >= 4 else 'UNKNOWN')).upper()
         # Live KEV/EPSS rankings require separate official-feed provenance.
@@ -149,12 +157,24 @@ def upsert_vulnerabilities(session, raw_entries):
         v.synthetic = entry.get('synthetic') is True
         v.raw = entry
         session.flush()
-        for old in session.scalars(select(AffectedPackage).where(AffectedPackage.vulnerability_id == ident)).all():
+        # A refresh by cve.now must never delete OSV or other-source evidence.
+        if not v.synthetic:
+            note_advisory(session, source='cve_now', source_id=ident,
+                          title=v.title, summary=v.summary, cvss=advisory_cvss,
+                          updated_at=v.modified_at,
+                          original_source=entry.get('source') if isinstance(entry.get('source'), str) else None,
+                          raw={'published': entry.get('publishedAt') or entry.get('published'),
+                               'affected_records': len(entry.get('affected') or [])})
+        for old in session.scalars(select(AffectedPackage).where(
+                AffectedPackage.vulnerability_id == ident,
+                AffectedPackage.source == 'cve_now')).all():
             session.delete(old)
         session.flush()
         for pkg in extract_affected(entry):
             session.add(AffectedPackage(vulnerability_id=ident, ecosystem=pkg['ecosystem'].casefold(),
-                                        package_name=pkg['name'].casefold(), affected_spec=pkg['spec']))
+                                        package_name=pkg['name'].casefold(), affected_spec=pkg['spec'],
+                                        source='cve_now', source_id=ident,
+                                        evidence_status='current'))
         processed += 1
     return processed
 
@@ -220,6 +240,10 @@ def main():
     last_inventory = 0
     last_cve = 0
     last_intel = 0
+    last_epss_csv = 0
+    last_osv = 0
+    last_nvd = 0
+    last_euvd = 0
     while True:
         current = time.monotonic()
         run_match = False
@@ -258,28 +282,71 @@ def main():
                 except Exception:
                     log.exception('CVE synchronization FAILED; previous data preserved')
                     last_cve = current
-            # One daily public GET-only refresh for real CVEs; disabled in demo.
-            intel_cfg = cfg.get('threat_intelligence', {})
-            intel_interval = max(1, int(intel_cfg.get('sync_hours', 24))) * 3600
-            if (mode == 'live' and intel_cfg.get('enabled', True)
-                    and (not last_intel or current - last_intel >= intel_interval)):
-                try:
-                    source = PublicThreatIntel()
-                    known_ids = [row.id for row in session.scalars(select(Vulnerability))
-                                 if not row.synthetic]
-                    kev_catalog = source.fetch_kev()
-                    epss_values = source.fetch_epss(known_ids)
-                    updated = record_run(session, 'threat_intel',
-                                         lambda: enrich_vulnerabilities(
-                                             session, kev_catalog=kev_catalog,
-                                             epss_values=epss_values))
-                    log.info('Daily public threat intelligence updated for %s CVEs', updated)
-                    last_intel = current
-                    run_match = True
-                except Exception:
-                    log.exception('Threat intelligence refresh FAILED; preserving existing values')
-                    # Back off for one hour, not a full day, after a transient error.
-                    last_intel = current - intel_interval + 3600
+            # Public vulnerability sources operate on the already-ingested
+            # software inventory. No second endpoint scan occurs.
+            if mode == 'live':
+                feeds = cfg.get('vulnerability_sources', {})
+                current_time = now()
+                if feeds.get('osv', {}).get('enabled', True) and (
+                        not last_osv or current - last_osv >= int(
+                            feeds.get('osv', {}).get('sync_minutes', 20)) * 60):
+                    try:
+                        count = record_run(session, 'osv', lambda: sync_osv(
+                            session, feeds.get('osv', {})))
+                        log.info('OSV approved package/version checks: %s', count)
+                        run_match = run_match or count > 0
+                    except Exception:
+                        log.exception('OSV refresh failed; existing evidence retained')
+                    last_osv = current
+
+                for name, sync_fn, last_value, hours in (
+                        ('nvd', sync_nvd, last_nvd, 2),
+                        ('euvd', sync_euvd, last_euvd, 4)):
+                    options = feeds.get(name, {})
+                    if not options.get('enabled', True):
+                        continue
+                    cadence = max(15, int(options.get('sync_minutes', hours * 60))) * 60
+                    if last_value and current - last_value < cadence:
+                        continue
+                    try:
+                        count = record_run(session, name,
+                                           lambda fn=sync_fn, opt=options: fn(session, opt))
+                        log.info('%s advisory metadata rows: %s', name.upper(), count)
+                        run_match = run_match or count > 0
+                    except Exception:
+                        log.exception('%s refresh failed; existing source metadata retained', name)
+                    if name == 'nvd':
+                        last_nvd = current
+                    else:
+                        last_euvd = current
+
+                intel_cfg = cfg.get('threat_intelligence', {})
+                intel_interval = max(1, int(intel_cfg.get('sync_hours', 24))) * 3600
+                if intel_cfg.get('enabled', True):
+                    if not last_intel or current - last_intel >= intel_interval:
+                        try:
+                            kev_catalog = PublicThreatIntel().fetch_kev()
+                            updated = record_run(session, 'threat_intel',
+                                lambda: enrich_vulnerabilities(
+                                    session, kev_catalog=kev_catalog, epss_values={}))
+                            log.info('Official CISA KEV refreshed for %s local CVEs', updated)
+                            run_match = True
+                            last_intel = current
+                        except Exception:
+                            log.exception('CISA KEV refresh failed; preserving prior flags')
+                            last_intel = current - intel_interval + 3600
+
+                    # FIRST recommends one full daily CSV for bulk synchronization.
+                    if not last_epss_csv or current - last_epss_csv >= intel_interval:
+                        try:
+                            updated = record_run(
+                                session, 'epss_csv', lambda: sync_epss_csv(session))
+                            log.info('Official FIRST daily CSV matched %s local CVEs', updated)
+                            run_match = True
+                            last_epss_csv = current
+                        except Exception:
+                            log.exception('FIRST daily CSV failed; preserving prior EPSS values')
+                            last_epss_csv = current - intel_interval + 3600
             if run_match:
                 try:
                     count = record_run(session, 'matching',
