@@ -595,6 +595,15 @@ VIEWS = {
  WHERE source IN ('inventory','cve','osv','nvd','euvd','threat_intel','epss_csv')
  GROUP BY source
 ''',
+'source_cursor_status': '''
+ SELECT source, state->>'start' AS pending_window_start,
+        state->>'end' AS pending_window_end,
+        state->>'offset' AS next_page_or_offset,
+        state->>'last_complete' AS last_complete_window_end,
+        updated_at,
+        (state ? 'start') AS has_pending_pages
+ FROM feed_checkpoints
+''',
 'osv_cache_coverage': '''
  SELECT count(*) AS checked_unique_package_versions,
         count(*) FILTER (WHERE source_ids IS NOT NULL
