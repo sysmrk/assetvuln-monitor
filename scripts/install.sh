@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 umask 077
 
 usage() {
-  printf '%s\n' 'Usage: ./install.sh [--demo|--live]' '  --demo: synthetic inventory and CVEs, NO ManageEngine required (default)' '  --live: use your configured ManageEngine API token and cve.now'
+  printf '%s\n' 'Usage: ./install.sh [--demo|--live]' '  --demo: synthetic inventory and CVEs, NO ManageEngine required (default)' '  --live: use Endpoint Central inventory and the configured public intelligence sources'
 }
 mode=demo
 case "${1:-}" in
