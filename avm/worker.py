@@ -13,7 +13,9 @@ from avm.settings import config
 from avm.models import (Asset, Software, Installation, Vulnerability, AffectedPackage,
                         Finding, SyncRun, initialize, now, session_factory)
 from avm.collectors import ManageEngineCollector, CveNowCollector
-from avm.demo import inventory as demo_inventory, vulnerabilities as demo_vulnerabilities
+from avm.demo import (inventory as demo_inventory,
+                      vulnerabilities as demo_vulnerabilities,
+                      seed_multisource_demo)
 from avm.matching import extract_affected, is_affected
 from avm.normalization import normalized_label, runtime_lookup
 from avm.mapping_review import approved_runtime_lookup, refresh_review_queue
@@ -283,7 +285,12 @@ def main():
             if not last_cve or current - last_cve >= int(cfg['cve']['sync_minutes'])*60:
                 try:
                     incoming = demo_vulnerabilities() if mode == 'demo' else CveNowCollector(cfg['cve']).collect()
-                    count = record_run(session, 'cve', lambda: upsert_vulnerabilities(session, incoming))
+                    def write_advisories():
+                        count = upsert_vulnerabilities(session, incoming)
+                        if mode == 'demo':
+                            seed_multisource_demo(session)
+                        return count
+                    count = record_run(session, 'cve', write_advisories)
                     log.info('CVE entries synchronized: %s', count)
                     run_match = True
                     last_cve = current
