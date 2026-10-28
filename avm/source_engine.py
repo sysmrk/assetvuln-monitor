@@ -30,6 +30,18 @@ def ids_from_aliases(value):
                    if isinstance(raw, str) and CVE_ID.fullmatch(raw.strip().upper())})
 
 
+def normalized_source_aliases(value):
+    """Keep safe GHSA/EUVD/OSV and CVE aliases for provenance, not fuzzy joins."""
+    if isinstance(value, str):
+        items = re.split(r'[\\s,;]+', value)
+    elif isinstance(value, (list, tuple)):
+        items = value
+    else:
+        items = []
+    return sorted({item.strip() for item in items
+                   if isinstance(item, str) and OSV_ID.fullmatch(item.strip())})
+
+
 def canonical_id(source_id, aliases=()):
     sources = ids_from_aliases([source_id] + list(aliases or []))
     # Conflicting CVE identifiers cannot be merged automatically.
@@ -54,7 +66,7 @@ def note_advisory(session, *, source, source_id, aliases=(), original_source=Non
     """Upsert source-specific metadata without overwriting another source's data."""
     if source not in SOURCE_ORDER or not isinstance(source_id, str) or not OSV_ID.fullmatch(source_id):
         raise ValueError('Unsupported source or invalid advisory ID')
-    aliases = ids_from_aliases(aliases)
+    aliases = normalized_source_aliases(aliases)
     canonical = canonical_id(source_id, aliases)
     existing = session.scalar(select(AdvisoryObservation).where(
         AdvisoryObservation.source == source, AdvisoryObservation.source_id == source_id))
