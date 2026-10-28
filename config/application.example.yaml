@@ -2,7 +2,8 @@
 # AssetVuln Monitor - Main configuration
 # ============================================================================
 # Start in DEMO mode when testing without access to ManageEngine.
-# For production, set mode to live and configure the ManageEngine section.
+# For a real-inventory staging/Live deployment, set mode to live and configure ManageEngine.
+# Live integration still requires validation before any production rollout.
 # No remote WRITE, POST, PUT, PATCH or DELETE operations are implemented.
 # Only edit values to the right of ':'. YAML indentation MUST use spaces.
 # Secrets belong in your generated private .env or secrets/ folder.
@@ -85,4 +86,5 @@ notifications:
   smtp_starttls: true
   sender: "security-alerts@example.org"
   recipients: ["soc@example.org"]
-  # Add SMTP_USER and SMTP_PASSWORD to .env locally if enabling email.
+  # Email is disabled by default. Authenticated SMTP requires explicitly
+  # passing SMTP_USER/SMTP_PASSWORD into the Worker environment and testing it.
