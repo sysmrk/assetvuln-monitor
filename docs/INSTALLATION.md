@@ -207,7 +207,7 @@ grep '^METABASE_ADMIN_PASSWORD=' .env
 
 Copy the values after the equals sign into Metabase's login page. **Never share the password output.**
 
-You should find a collection named **AssetVuln Monitor · Security Workspace** with nine dashboards. If Metabase opens but the dashboards are missing, see [Troubleshooting](TROUBLESHOOTING.md#dashboard-or-metabase-problems).
+You should find a collection named **AssetVuln Monitor · Security Workspace** with nine dashboards. If Metabase opens but the dashboards are missing, see [Troubleshooting](TROUBLESHOOTING.md#2-dashboard-or-metabase-problems).
 
 ### A5. Your first five checks
 
