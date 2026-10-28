@@ -4,14 +4,22 @@ cd "$(dirname "$0")/.."
 umask 077
 
 usage() {
-  printf '%s\n' 'Usage: ./install.sh [--demo|--live]' '  --demo: synthetic inventory and CVEs, NO ManageEngine required (default)' '  --live: use Endpoint Central inventory and the configured public intelligence sources'
+  printf '%s\n' 'Usage: ./install.sh [--demo|--live] [--skip-build]' '  --demo: synthetic inventory and CVEs, NO ManageEngine required (default)' '  --live: use Endpoint Central inventory and the configured public intelligence sources' '  --skip-build: use an already built local worker image (for offline/restricted Docker builds)'
 }
 mode=demo
-case "${1:-}" in
-  ''|--demo) mode=demo ;;
-  --live) mode=live ;;
-  *) usage; exit 2 ;;
-esac
+skip_build=false
+mode_seen=false
+for arg in "$@"; do
+  case "$arg" in
+    --demo|--live)
+      if [[ "$mode_seen" == true ]]; then usage; exit 2; fi
+      mode="${arg#--}"
+      mode_seen=true
+      ;;
+    --skip-build) skip_build=true ;;
+    *) usage; exit 2 ;;
+  esac
+done
 
 for program in docker openssl python3; do
   if ! command -v "$program" >/dev/null 2>&1; then
@@ -149,8 +157,18 @@ fi
 # Create the mode marker before starting any container (also protects failed first installs).
 printf '%s\n' "$mode" > secrets/installation-mode
 chmod 600 secrets/installation-mode
-echo 'Building application and starting services...'
-docker compose up -d --build postgres worker metabase nginx
+if [[ "$skip_build" == true ]]; then
+  worker_image="${project_name}-worker:latest"
+  if ! docker image inspect "$worker_image" >/dev/null 2>&1; then
+    echo "ERROR: Missing local image $worker_image. Build it first using docker build -f docker/Dockerfile ." >&2
+    exit 1
+  fi
+  echo 'Starting services using the existing worker image (no build)...'
+  docker compose up -d --no-build postgres worker metabase nginx
+else
+  echo 'Building application and starting services...'
+  docker compose up -d --build postgres worker metabase nginx
+fi
 
 echo 'Provisioning the Metabase account, reporting connection and dashboards...'
 if ! docker compose --profile setup run --rm bootstrap; then
