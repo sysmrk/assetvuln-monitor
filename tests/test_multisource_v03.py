@@ -162,5 +162,6 @@ def test_demo_sources_are_synthetic_and_offline():
         observed = {r.source for r in db.scalars(select(AdvisoryObservation))}
         assert observed == {'cve_now', 'osv', 'nvd', 'euvd'}
         assert db.get(Vulnerability, 'CVE-DEMO-0001').synthetic is True
-        assert db.get(Vulnerability, 'CVE-DEMO-0001').cvss_source is None
+        assert db.get(Vulnerability, 'CVE-DEMO-0001').cvss_source == 'cve_now'
+        assert float(db.get(Vulnerability, 'CVE-DEMO-0001').cvss) == 9.1
     engine.dispose()
