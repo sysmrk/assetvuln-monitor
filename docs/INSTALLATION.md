@@ -29,7 +29,7 @@ No manual .env setup is required. The installer:
 3. Creates private Demo application YAML and empty business-context YAML.
 4. Creates a temporary localhost certificate if TLS material is missing.
 5. Validates the Compose project name, required passwords and Demo/Live mode lock.
-6. Builds and starts the four existing containers and provisions all eight dashboards.
+6. Builds and starts the four existing containers and provisions all nine dashboards.
 
 The default URL is **https://localhost:8445** (self-signed certificate warning expected). To read your local account:
 
@@ -134,6 +134,10 @@ docker compose config --quiet
 ~~~
 
 The V3 GitHub Actions workflow runs Unit tests, a throwaway PostgreSQL integration job, shell/Compose checks and V1/V2 collision comparisons. The GitHub Actions synthetic Docker Demo smoke test has also passed (one-command install, Metabase HTTPS health, risk reporting views and CLI). These are **not** a production certification or a real Endpoint Central test. See [V3 operations](V03-OPERATIONS.md), [security](SECURITY.md) and [troubleshooting](TROUBLESHOOTING.md).
+
+## Public data sources
+
+Live automatically enables OSV package-version lookup, NVD delta CVE metadata, EUVD supplemental metadata, the daily FIRST EPSS CSV and CISA KEV alongside cve.now. These require **no additional containers or mandatory API keys**. An optional NVD_API_KEY can be set in the private .env for greater API throughput. Outbound access is needed to public APIs; approve sharing unique installed package/version information with OSV. See [source design and audit controls](V03-MULTISOURCE.md).
 
 ## Critical limitation
 
