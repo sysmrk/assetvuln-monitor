@@ -68,7 +68,7 @@ def test_ninth_dashboard_provenance_and_read_only_sources():
     assert {cls.__tablename__ for cls in (AdvisoryObservation, OsvPackageCheck, FeedCheckpoint)} == {
         'advisory_observations', 'osv_package_checks', 'feed_checkpoints'}
     required = {'source_coverage', 'source_advisories', 'source_evidence',
-                'finding_source_details', 'source_sync_health', 'source_cursor_status', 'source_retractions', 'osv_cache_coverage'}
+                'finding_source_details', 'source_sync_health', 'source_cursor_status', 'source_retractions', 'source_conflicts', 'osv_cache_coverage'}
     assert required.issubset(VIEWS)
     board = DASHBOARDS['09 · Source Intelligence & Coverage']
     assert len(board) >= 10
