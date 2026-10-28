@@ -147,7 +147,11 @@ def mark_query_evidence(session, *, ecosystem, package_name, version, source_rec
             title=record.get('summary'), summary=record.get('details'),
             updated_at=parse_time(record.get('modified')),
             raw={'references': (record.get('references') or [])[:8],
-                 'withdrawn': False})
+                 'withdrawn': False, 'aliases': (record.get('aliases') or [])[:25],
+                 'affected': (record.get('affected') or [])[:250],
+                 'modified': record.get('modified'),
+                 'summary': str(record.get('summary') or '')[:500],
+                 'database_specific': record.get('database_specific') or {}})
         positives[osv_id] = canonical
 
     old = session.scalars(select(AffectedPackage).where(
