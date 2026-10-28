@@ -170,6 +170,7 @@ def upsert_vulnerabilities(session, raw_entries):
         # A refresh by cve.now must never delete OSV or other-source evidence.
         if not v.synthetic:
             note_advisory(session, source='cve_now', source_id=ident,
+                          aliases=entry.get('aliases') or [],
                           title=v.title, summary=v.summary, cvss=advisory_cvss,
                           updated_at=v.modified_at,
                           original_source=entry.get('source') if isinstance(entry.get('source'), str) else None,
