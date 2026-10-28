@@ -67,6 +67,7 @@ def test_v03_postgres_schema_and_risk_dashboard():
             assert conn.execute(text('SELECT count(*) FROM reporting.source_cursor_status')).scalar() >= 0
             assert conn.execute(text('SELECT count(*) FROM reporting.osv_cache_coverage')).scalar() == 1
             assert conn.execute(text('SELECT count(*) FROM reporting.source_retractions')).scalar() >= 0
+            assert conn.execute(text('SELECT count(*) FROM reporting.source_conflicts')).scalar() >= 0
             assert conn.execute(text("SELECT has_table_privilege('avm_reader','public.finding_events','INSERT')")).scalar() is False
         reader = create_engine('postgresql+psycopg://avm_reader:ci_reader_local_only@127.0.0.1:5432/avm')
         try:
