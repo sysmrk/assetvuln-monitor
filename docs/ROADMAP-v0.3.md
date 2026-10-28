@@ -74,7 +74,10 @@ Primary design rules:
 ## Key modules
 
 - avm/risk.py — pure explainable scoring, evidence, candidate remediation, simulation
-- avm/threat_intel.py — CISA/FIRST GET-only clients and strict enrichment
+- avm/threat_intel.py — CISA KEV catalog and trusted enrichment
+- avm/epss_csv.py — official FIRST daily bulk CSV
+- avm/source_collectors.py — OSV QueryBatch, NVD and EUVD bounded adapters
+- avm/source_engine.py — source-specific advisory identity, aliases and evidence
 - avm/asset_context.py — opt-in verified organizational context
 - avm/lifecycle.py — conservative Finding transitions and daily snapshots
 - avm/ops.py — minimal privileged CLI for queue/simulate/accept/release
