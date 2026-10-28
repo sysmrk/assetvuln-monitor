@@ -1,6 +1,6 @@
-"""Daily GET-only enrichment from public CISA KEV and FIRST EPSS sources.
+"""CISA KEV trusted enrichment and legacy FIRST small-lookup helper.
 
-Both sources have fixed HTTPS origins. No API keys, new containers or database
+Bulk FIRST ingestion now uses avm.epss_csv instead of lookup APIs. No new containers or database
 credentials. Ingestion is atomic: upstream failures never clear past signals.
 """
 import re
