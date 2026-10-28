@@ -559,7 +559,7 @@ VIEWS = {
 ''',
 'source_evidence': '''
  SELECT p.vulnerability_id AS canonical_id, p.source, p.source_id,
-        p.ecosystem, p.package_name, p.matched_version, p.affected_spec
+        p.ecosystem, p.package_name, p.matched_version, p.evidence_status, p.affected_spec
  FROM affected_packages p
 ''',
 'finding_source_details': '''
