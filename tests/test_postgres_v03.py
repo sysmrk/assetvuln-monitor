@@ -64,6 +64,7 @@ def test_v03_postgres_schema_and_risk_dashboard():
             assert conn.execute(text('SELECT count(*) FROM reporting.source_evidence')).scalar() >= 1
             assert conn.execute(text('SELECT count(*) FROM reporting.finding_source_details')).scalar() >= 1
             assert conn.execute(text('SELECT count(*) FROM reporting.source_sync_health')).scalar() >= 0
+            assert conn.execute(text('SELECT count(*) FROM reporting.source_cursor_status')).scalar() >= 0
             assert conn.execute(text('SELECT count(*) FROM reporting.osv_cache_coverage')).scalar() == 1
             assert conn.execute(text('SELECT count(*) FROM reporting.source_retractions')).scalar() >= 0
             assert conn.execute(text("SELECT has_table_privilege('avm_reader','public.finding_events','INSERT')")).scalar() is False
