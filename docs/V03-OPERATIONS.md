@@ -7,7 +7,7 @@ These commands run inside the existing v0.3 Worker container. There is **no seco
 1. The existing Worker periodically downloads asset/software inventory (ManageEngine) and structured advisories (cve.now).
 2. Software identity suggestions are held for human review. Only verified YAML or explicitly approved DB mappings can create potential findings.
 3. Each potential finding gets a JSON evidence snapshot, priority components, an SLA target and a conservative remediation suggestion.
-4. Every ~24 hours **in Live only**, the same Worker requests CISA KEV and FIRST EPSS for known CVEs using HTTPS GET. API keys are **not required**. On failures, previous intelligence is kept and the Worker retries later.
+4. Every ~24 hours **in Live only**, the same Worker downloads CISA KEV over HTTPS GET and the FIRST complete daily compressed EPSS CSV for local CVE enrichment. No API keys are required. OSV/NVD/EUVD enrichment uses the existing Worker with independent schedules. On failures, previous intelligence is kept and the Worker retries later.
 5. Successful inventory observations update the lifecycle. A missing match becomes **not_observed**, never automatically **resolved** or **patched**; incomplete/failed inventory does not close prior findings.
 6. The eighth Metabase dashboard tracks priorities, KEV, overdue findings, ownership, evidence, lifecycle/audit, context completeness and one daily modeled-score snapshot.
 
