@@ -180,6 +180,10 @@ DASHBOARDS = {
          'SELECT canonical_id, source, source_id, ecosystem, package_name, '
          'matched_version, evidence_status, affected_spec '
          'FROM reporting.source_evidence ORDER BY canonical_id LIMIT 2000', 24),
+        ('Retracted OSV Evidence Requiring Review', 'table',
+         'SELECT canonical_id, source_id, ecosystem, package_name, matched_version, '
+         'affected_active_assets FROM reporting.source_retractions '
+         'ORDER BY affected_active_assets DESC LIMIT 2000', 24),
         ('OSV Cache Last Refreshed', 'table',
          'SELECT checked_unique_package_versions, with_osv_advisories, last_checked_at '
          'FROM reporting.osv_cache_coverage', 24),
