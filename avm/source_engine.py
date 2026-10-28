@@ -33,7 +33,7 @@ def ids_from_aliases(value):
 def normalized_source_aliases(value):
     """Keep safe GHSA/EUVD/OSV and CVE aliases for provenance, not fuzzy joins."""
     if isinstance(value, str):
-        items = re.split(r'[\\s,;]+', value)
+        items = re.split(r'[\s,;]+', value)
     elif isinstance(value, (list, tuple)):
         items = value
     else:
