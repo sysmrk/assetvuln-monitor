@@ -2,9 +2,9 @@ from avm.dashboards import DASHBOARDS
 from avm.models import VIEWS, Asset, Software, Installation, Vulnerability, AffectedPackage, Finding, SyncRun
 
 
-def test_eight_complete_dashboards():
-    assert len(DASHBOARDS) == 8
-    assert sum(len(cards) for cards in DASHBOARDS.values()) >= 55
+def test_nine_complete_dashboards():
+    assert len(DASHBOARDS) == 9
+    assert sum(len(cards) for cards in DASHBOARDS.values()) >= 65
     for cards in DASHBOARDS.values():
         assert cards
         for name, display, query, width in cards:
@@ -60,3 +60,20 @@ def test_v03_risk_intelligence_queries_are_read_only():
         sql = VIEWS[view].upper().lstrip()
         assert sql.startswith(('SELECT', 'WITH'))
         assert not any(token in sql for token in ('DELETE FROM', 'INSERT INTO', 'UPDATE ', 'DROP TABLE'))
+
+
+
+def test_ninth_dashboard_provenance_and_read_only_sources():
+    from avm.models import AdvisoryObservation, OsvPackageCheck, FeedCheckpoint
+    assert {cls.__tablename__ for cls in (AdvisoryObservation, OsvPackageCheck, FeedCheckpoint)} == {
+        'advisory_observations', 'osv_package_checks', 'feed_checkpoints'}
+    required = {'source_coverage', 'source_advisories', 'source_evidence',
+                'finding_source_details', 'source_sync_health', 'osv_cache_coverage'}
+    assert required.issubset(VIEWS)
+    board = DASHBOARDS['09 · Source Intelligence & Coverage']
+    assert len(board) >= 10
+    assert all(query.startswith('SELECT') for name, display, query, width in board)
+    for name in required:
+        sql = VIEWS[name].upper().lstrip()
+        assert sql.startswith('SELECT')
+        assert not any(verb in sql for verb in ('DELETE FROM', 'UPDATE ', 'ALTER TABLE'))
