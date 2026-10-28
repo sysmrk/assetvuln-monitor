@@ -521,3 +521,26 @@ flowchart TD
 - [Security checklist and known limitations](SECURITY.md)
 
 **Release status:** V3 is still under development. Automated tests include an actual Docker **synthetic Demo**, but they do **not** certify real Endpoint Central APIs, every changing public feed, complete historic CVE coverage, or enterprise-scale performance. Validate Live in staging first.
+
+
+### Restricted Docker networking: build once and reuse the image
+
+If `docker pull` works but BuildKit times out while reading Docker Hub metadata, and
+Docker's default bridge network cannot complete TLS handshakes with PyPI, first
+verify host networking is permitted in your environment. On a trusted local
+Linux/WSL development machine you can build the Worker without modifying the
+Dockerfile or copying it to the repository root:
+
+```bash
+DOCKER_BUILDKIT=0 docker build --network=host \\
+  --build-arg PIP_INDEX_URL=https://pypi.org/simple \\
+  -t assetvuln-monitor-v03-worker:latest -f docker/Dockerfile .
+./install.sh --demo --skip-build
+```
+
+The image tag must match `COMPOSE_PROJECT_NAME` in `.env` plus `-worker:latest`.
+`--skip-build` uses that local image for **both** Worker and one-off Metabase
+bootstrap, and still runs all remaining installer steps. It does **not** repair
+outbound connectivity for running containers: fix the Docker bridge/egress
+network before relying on live external intelligence feeds. Avoid host networking
+in production without an explicit network/security review.
