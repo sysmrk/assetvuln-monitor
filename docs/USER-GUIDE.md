@@ -18,7 +18,7 @@ grep '^METABASE_ADMIN_PASSWORD=' .env
 
 Use these values on the login page. The local self-signed certificate can cause a browser warning; **do not accept such a warning on an untrusted or public remote deployment**.
 
-Inside Metabase, open **Collections**, then **AssetVuln Monitor · Security Workspace**. The installer creates **nine** dashboards. If the collection or dashboards are missing, follow [this repair path](TROUBLESHOOTING.md#dashboard-or-metabase-problems).
+Inside Metabase, open **Collections**, then **AssetVuln Monitor · Security Workspace**. The installer creates **nine** dashboards. If the collection or dashboards are missing, follow [this repair path](TROUBLESHOOTING.md#2-dashboard-or-metabase-problems).
 
 ## 2. The big picture — what a Finding means
 
@@ -63,7 +63,7 @@ You will see fleet totals, potential exposure metrics, severity distribution and
 
 Look for a plausible hostname, domain, OS and last-seen timestamp. In **Demo**, these hosts are fictional. In **Live**, compare counts with Endpoint Central.
 
-If there are no Live assets, **do not troubleshoot CVEs first**: inspect the Worker log and Endpoint Central API configuration. [Exact commands](TROUBLESHOOTING.md#no-inventory-or-no-findings).
+If there are no Live assets, **do not troubleshoot CVEs first**: inspect the Worker log and Endpoint Central API configuration. [Exact commands](TROUBLESHOOTING.md#3-no-inventory-or-no-findings).
 
 ### 03 · Software Catalog — inspect installed versions
 
