@@ -572,6 +572,20 @@ VIEWS = {
  FROM findings f JOIN installations i ON i.id=f.installation_id
  JOIN assets a ON a.id=i.asset_id JOIN software s ON s.id=i.software_id
 ''',
+'source_retractions': '''
+ SELECT p.vulnerability_id AS canonical_id, p.source, p.source_id,
+        p.ecosystem, p.package_name, p.matched_version,
+        count(DISTINCT i.asset_id) AS affected_active_assets
+ FROM affected_packages p
+ JOIN software s ON lower(s.ecosystem)=p.ecosystem
+                AND lower(s.package_name)=p.package_name
+ JOIN installations i ON i.software_id=s.id AND i.version=p.matched_version
+ JOIN assets a ON a.id=i.asset_id
+ WHERE p.evidence_status='retracted' AND p.source='osv'
+   AND i.active AND a.active
+ GROUP BY p.vulnerability_id, p.source, p.source_id,
+          p.ecosystem, p.package_name, p.matched_version
+''',
 'source_sync_health': '''
  SELECT source, max(finished_at) FILTER (WHERE success) AS last_success,
         max(finished_at) FILTER (WHERE NOT success) AS last_failure,
@@ -596,6 +610,17 @@ def initialize(engine):
     Base.metadata.create_all(engine)
     upgrade_v03(engine)
     with engine.begin() as conn:
+        # These indexes protect deduplicated lookups on large inventories;
+        # no new infrastructure or worker process is needed.
+        if engine.dialect.name == 'postgresql':
+            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_avm_install_active_software_version '
+                              'ON installations (software_id, version) WHERE active'))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_avm_affected_active_sources '
+                              'ON affected_packages (ecosystem, package_name, matched_version, source)'))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_avm_osv_cache_checked '
+                              'ON osv_package_checks (checked_at)'))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_avm_observation_canonical '
+                              'ON advisory_observations (vulnerability_id)'))
         conn.execute(text('CREATE SCHEMA IF NOT EXISTS reporting'))
         for name, query in VIEWS.items():
             conn.execute(text(f'CREATE OR REPLACE VIEW reporting.{name} AS {query}'))
