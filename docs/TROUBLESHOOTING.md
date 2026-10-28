@@ -15,8 +15,10 @@ Use the current V3 checkout (not V1 or V2). Never copy a populated .env or a dat
 | Live Endpoint Central API fails | Run python3 scripts/test_manageengine_api.py; verify the exact API path, read-only token, HTTPS URL and trusted internal CA. |
 | Source sync shows no current data | Check reporting.ingestion_health / reporting.data_quality_sync_freshness and worker logs. Missing data cannot establish remediation. |
 | No live CVE findings | The approved Live mapping catalogue starts empty; approve real software identities and verify cve.now structured affected-version ranges. Empty results do **not** imply no vulnerabilities. |
+| Missing OSV data | Only approved mapped package+version tuples are queried. Check outbound HTTPS access, reporting.osv_cache_coverage and Worker logs. OSV read-only lookup uses HTTPS POST. |
+| Missing NVD/EUVD data | First imports use limited recent-date windows; large windows resume using checkpoints. Failed feeds do not stop inventory or other sources. |
 | No automatic similarity suggestions | The similarity engine compares to an existing approved catalogue; an empty approved catalogue intentionally produces no candidates. Create a manual proposal first. |
-| No CISA/EPSS metrics | Public threat intelligence runs only in Live on a daily schedule; verify outbound HTTPS/DNS and worker logs. A failed request preserves old values. |
+| No CISA/EPSS metrics | Public threat intelligence runs only in Live on a daily schedule; verify outbound HTTPS/DNS and worker logs. A failed request or invalid daily CSV preserves old values. |
 | Many unknown criticality / exposure values | Expected until verified source_id entries are added to config/asset-context.yaml. The application never guesses these fields. |
 | Mapping approval seems ignored | The Worker applies approved DB identities at the next successful inventory synchronization. The CLI itself never changes old software rows. |
 | Potential findings marked not_observed | This is a conservative state after a successful inventory; it does not assert that a patch was installed or issue fully resolved. |
