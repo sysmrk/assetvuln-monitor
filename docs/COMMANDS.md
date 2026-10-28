@@ -50,6 +50,7 @@ Expected Git branch: **develop/v0.3**. The Compose project normally starts with 
 | **scripts/restore.sh** | Restores both databases from a verified backup | Recovery only; requires typing RESTORE | **Destructive for current database contents** |
 | **scripts/suggest_mappings.py** | Offline proposed mappings from a local inventory CSV | Optional advanced research | Writes JSON report only when --output is given |
 | **scripts/check_compose_isolation.py** | Compares resource names/ports with another checkout | Optional before colocating versions | Reads Compose configuration, starts nothing |
+| **scripts/check_docs.py** | Checks local documentation links and heading anchors | CI automatically; optional local validation | Read-only; no network needed |
 | **avm.review_cli** | Privileged proposal/approval/rejection workflow | After you have confirmed package identity | Local DB writes for propose/approve/reject |
 | **avm.ops** | Read-only priority queue/simulation; explicit risk acceptance/release | Daily review and approved exceptions | queue/simulate = read; accept/release = local DB write |
 | **avm.bootstrap** | Metabase account, report connection, questions and dashboards | Installer does this automatically | Metabase metadata, never endpoints |
