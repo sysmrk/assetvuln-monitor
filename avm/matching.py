@@ -11,8 +11,15 @@ def version(v):
 
 def is_affected(installed, spec):
     """OSV-style affected. None indicates unsupported/unverifiable version data."""
+    if not isinstance(spec, dict):
+        return None
+    # An OSV package+version query explicitly asserted the exact raw version.
+    # Do not reject distro/vendor version strings simply because Python's
+    # PEP 440 parser cannot interpret them. No extrapolation is permitted.
+    if spec.get('osv_query') == 'package_and_version':
+        return str(installed) in (spec.get('versions') or [])
     v = version(installed)
-    if v is None or not isinstance(spec, dict):
+    if v is None:
         return None
     explicit = spec.get('versions') or []
     if explicit and any(version(item) == v for item in explicit if version(item) is not None):
