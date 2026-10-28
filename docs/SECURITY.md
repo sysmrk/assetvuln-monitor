@@ -2,7 +2,7 @@
 
 ## Non-negotiable invariant
 
-AssetVuln Monitor is **read-only toward managed Endpoint Central assets**. External inventory, CVE and public threat-intelligence clients support GET-only operations. No patch deployment, SSH execution, configuration changes, vulnerability exploitation, or remote endpoint actions are implemented. Metabase bootstrap can issue authenticated POST/PUT requests **only to the local Metabase service** to create dashboard configuration; this is not an Endpoint Central action.
+AssetVuln Monitor is **read-only toward managed Endpoint Central assets**. Endpoint Central inventory uses HTTPS GET-only operations. OSV uses HTTPS POST solely for a public read-only query; other CVE metadata and CISA sources use GET. FIRST's daily EPSS CSV is downloaded over HTTPS. No patch deployment, SSH execution, configuration changes, vulnerability exploitation, or remote endpoint actions are implemented. Metabase bootstrap can issue authenticated POST/PUT requests **only to the local Metabase service** to create dashboard configuration; this is not an Endpoint Central action.
 
 ## Separation and secrets
 
