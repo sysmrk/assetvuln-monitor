@@ -125,6 +125,7 @@ def mark_query_evidence(session, *, ecosystem, package_name, version, source_rec
         if not isinstance(affected, list):
             raise ValueError('OSV affected must be an array')
         supported = False
+        matching_spec = None
         for item in affected:
             if not isinstance(item, dict) or not isinstance(item.get('package'), dict):
                 continue
@@ -137,6 +138,7 @@ def mark_query_evidence(session, *, ecosystem, package_name, version, source_rec
             # Label it as a query-specific potential match, never an exact
             # proven version-range match.
             supported = True
+            matching_spec = spec
             break
         if not supported:
             continue
@@ -152,7 +154,7 @@ def mark_query_evidence(session, *, ecosystem, package_name, version, source_rec
                  'modified': record.get('modified'),
                  'summary': str(record.get('summary') or '')[:500],
                  'database_specific': record.get('database_specific') or {}})
-        positives[osv_id] = canonical
+        positives[osv_id] = (canonical, matching_spec)
 
     old = session.scalars(select(AffectedPackage).where(
         AffectedPackage.source == 'osv', AffectedPackage.ecosystem == key[0],
@@ -162,7 +164,7 @@ def mark_query_evidence(session, *, ecosystem, package_name, version, source_rec
         # Retracted evidence remains in the DB for analysts.
         if row.source_id not in positives:
             row.evidence_status = 'retracted'
-    for osv_id, canonical in positives.items():
+    for osv_id, (canonical, matching_spec) in positives.items():
         row = next((r for r in old if r.source_id == osv_id), None)
         if row is None:
             row = AffectedPackage(source='osv', source_id=osv_id,
@@ -172,7 +174,11 @@ def mark_query_evidence(session, *, ecosystem, package_name, version, source_rec
         row.evidence_status = 'current'
         # Scoped exact-version evidence: OSV querybatch was authoritative
         # about this specific tuple; we do not extrapolate to other versions.
+        # Keep OSV's actual version-range evidence for remediation hints.
+        # Only the queried version is asserted, never all versions from a
+        # partial range with unsupported vendor-specific comparison rules.
         row.affected_spec = {'versions': [version],
+                             'ranges': (matching_spec or {}).get('ranges') or [],
                              'osv_query': 'package_and_version'}
     cache.checked_at = now()
     cache.source_ids = sorted(positives)
