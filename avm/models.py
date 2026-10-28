@@ -72,6 +72,9 @@ class Vulnerability(Base):
     retrieved_at = Column(DateTime(timezone=True), default=now, nullable=False)
     synthetic = Column(Boolean, default=False, nullable=False)
     raw = Column(JSON)
+    cvss_source = Column(String(24))
+    epss_percentile = Column(Numeric(8, 6))
+    epss_date = Column(String(10))
 
 
 class AffectedPackage(Base):
@@ -81,6 +84,10 @@ class AffectedPackage(Base):
     ecosystem = Column(String(100), nullable=False)
     package_name = Column(String(500), nullable=False)
     affected_spec = Column(JSON, nullable=False)
+    # V3.1 explicit source provenance: legacy rows default to cve_now.
+    source = Column(String(24), nullable=False, default='cve_now')
+    source_id = Column(String(100))
+    matched_version = Column(String(150))
 
 
 class Finding(Base):
@@ -184,6 +191,45 @@ class ApprovedSoftwareMapping(Base):
 
 
 
+
+class AdvisoryObservation(Base):
+    """Source-specific metadata, never directly treated as asset exposure."""
+    __tablename__ = 'advisory_observations'
+    id = Column(Integer, primary_key=True)
+    source = Column(String(24), nullable=False)
+    source_id = Column(String(100), nullable=False)
+    vulnerability_id = Column(String(100), ForeignKey('vulnerabilities.id'), nullable=False, index=True)
+    aliases = Column(JSON, nullable=False, default=list)
+    original_source = Column(String(300))
+    cvss = Column(Numeric(4, 1))
+    status = Column(String(24), nullable=False, default='published')
+    updated_at = Column(DateTime(timezone=True))
+    fetched_at = Column(DateTime(timezone=True), nullable=False, default=now)
+    raw = Column(JSON)
+    __table_args__ = (UniqueConstraint('source', 'source_id', name='uq_advisory_source_identity'),)
+
+
+class OsvPackageCheck(Base):
+    """Durable per unique approved package/version query cache."""
+    __tablename__ = 'osv_package_checks'
+    id = Column(Integer, primary_key=True)
+    ecosystem = Column(String(100), nullable=False)
+    package_name = Column(String(500), nullable=False)
+    version = Column(String(150), nullable=False)
+    checked_at = Column(DateTime(timezone=True), nullable=False, default=now)
+    source_ids = Column(JSON, nullable=False, default=list)
+    __table_args__ = (UniqueConstraint('ecosystem', 'package_name', 'version',
+                                      name='uq_osv_package_query'),)
+
+
+class FeedCheckpoint(Base):
+    """Only advance after successful, completely consumed source pages."""
+    __tablename__ = 'feed_checkpoints'
+    source = Column(String(24), primary_key=True)
+    state = Column(JSON, nullable=False, default=dict)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=now)
+
+
 class FindingEvent(Base):
     __tablename__ = 'finding_events'
     id = Column(Integer, primary_key=True)
@@ -214,7 +260,10 @@ V3_ADDITIVE_COLUMNS = {
         "owner varchar(200) NOT NULL DEFAULT ''",
     ),
     'vulnerabilities': ('kev_verified boolean NOT NULL DEFAULT false', 'epss_asof timestamptz', 'kev_action text',
-                        'intel_checked_at timestamptz'),
+                        'intel_checked_at timestamptz', 'cvss_source varchar(24)',
+                        'epss_percentile numeric(8,6)', 'epss_date varchar(10)'),
+    'affected_packages': ("source varchar(24) NOT NULL DEFAULT 'cve_now'",
+                          "source_id varchar(100)", "matched_version varchar(150)"),
     'findings': ('risk_score numeric(5,2)', 'priority varchar(3)',
                  'risk_factors json', 'evidence_packet json', 'remediation json',
                  "workflow_state varchar(24) NOT NULL DEFAULT 'open'",
@@ -490,6 +539,58 @@ VIEWS = {
         count(*) FILTER (WHERE active AND internet_facing IS NULL) AS unknown_exposure,
         count(*) FILTER (WHERE active AND owner='') AS unassigned_owner
  FROM assets
+'''
+
+,
+'source_coverage': '''
+ SELECT source, count(*) AS advisory_count,
+        count(*) FILTER (WHERE status='withdrawn') AS withdrawn,
+        count(*) FILTER (WHERE cvss IS NOT NULL) AS scored,
+        max(fetched_at) AS last_fetched_at
+ FROM advisory_observations GROUP BY source
+''',
+'source_advisories': '''
+ SELECT o.source, o.source_id, o.vulnerability_id AS canonical_id,
+        o.original_source, o.aliases, o.status, o.cvss AS source_cvss,
+        o.updated_at, o.fetched_at, v.cvss AS selected_cvss,
+        v.cvss_source AS selected_cvss_source
+ FROM advisory_observations o JOIN vulnerabilities v ON v.id=o.vulnerability_id
+''',
+'source_evidence': '''
+ SELECT p.vulnerability_id AS canonical_id, p.source, p.source_id,
+        p.ecosystem, p.package_name, p.matched_version, p.affected_spec
+ FROM affected_packages p
+''',
+'finding_source_details': '''
+ SELECT f.id AS finding_id, f.vulnerability_id AS canonical_id,
+        a.hostname, s.name AS software, i.version,
+        f.active, f.workflow_state, f.priority, f.risk_score,
+        coalesce(string_agg(DISTINCT p.source, ', ' ORDER BY p.source), 'unknown') AS evidence_sources,
+        count(DISTINCT p.source) AS distinct_sources,
+        f.evidence_packet, f.last_detected
+ FROM findings f JOIN installations i ON i.id=f.installation_id
+ JOIN assets a ON a.id=i.asset_id JOIN software s ON s.id=i.software_id
+ LEFT JOIN affected_packages p ON p.vulnerability_id=f.vulnerability_id
+   AND p.ecosystem=lower(s.ecosystem)
+   AND p.package_name=lower(s.package_name)
+   AND (p.matched_version IS NULL OR p.matched_version=i.version)
+ GROUP BY f.id, a.hostname, s.name, i.version
+''',
+'source_sync_health': '''
+ SELECT source, max(finished_at) FILTER (WHERE success) AS last_success,
+        max(finished_at) FILTER (WHERE NOT success) AS last_failure,
+        count(*) FILTER (WHERE success) AS successes,
+        count(*) FILTER (WHERE NOT success) AS failures
+ FROM sync_runs
+ WHERE source IN ('inventory','cve','osv','nvd','euvd','threat_intel','epss_csv')
+ GROUP BY source
+''',
+'osv_cache_coverage': '''
+ SELECT count(*) AS checked_unique_package_versions,
+        count(*) FILTER (WHERE source_ids IS NOT NULL
+           AND json_array_length(source_ids)>0) AS with_osv_advisories,
+        max(checked_at) AS last_checked_at
+ FROM osv_package_checks
 '''
 
 }
