@@ -566,16 +566,11 @@ VIEWS = {
  SELECT f.id AS finding_id, f.vulnerability_id AS canonical_id,
         a.hostname, s.name AS software, i.version,
         f.active, f.workflow_state, f.priority, f.risk_score,
-        coalesce(string_agg(DISTINCT p.source, ', ' ORDER BY p.source), 'unknown') AS evidence_sources,
-        count(DISTINCT p.source) AS distinct_sources,
+        coalesce(f.evidence_packet->'reporting_sources','[]'::json) AS reporting_sources,
+        coalesce(json_array_length(f.evidence_packet->'reporting_sources'),0) AS reporting_path_count,
         f.evidence_packet, f.last_detected
  FROM findings f JOIN installations i ON i.id=f.installation_id
  JOIN assets a ON a.id=i.asset_id JOIN software s ON s.id=i.software_id
- LEFT JOIN affected_packages p ON p.vulnerability_id=f.vulnerability_id
-   AND p.ecosystem=lower(s.ecosystem)
-   AND p.package_name=lower(s.package_name)
-   AND (p.matched_version IS NULL OR p.matched_version=i.version)
- GROUP BY f.id, a.hostname, s.name, i.version
 ''',
 'source_sync_health': '''
  SELECT source, max(finished_at) FILTER (WHERE success) AS last_success,
