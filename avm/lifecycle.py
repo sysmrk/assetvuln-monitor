@@ -52,10 +52,16 @@ def recalculate_findings(session, *, allow_disappearance=False, sla_days=None):
         if not asset or not asset.active or not product or not product.ecosystem or not product.package_name:
             continue
         grouped = defaultdict(list)
+        # Only a *definite* FALSE from a comparable, explicit affected range
+        # can be called a potential disagreement; silence is not a negative vote.
+        evaluated_by_source = defaultdict(lambda: defaultdict(list))
         for affected in packages.get((product.ecosystem.casefold(), product.package_name.casefold()), []):
             if affected.matched_version is not None and affected.matched_version != installed.version:
                 continue
-            if is_affected(installed.version, affected.affected_spec) is True:
+            evaluated = is_affected(installed.version, affected.affected_spec)
+            if evaluated is not None:
+                evaluated_by_source[affected.vulnerability_id][affected.source or 'cve_now'].append(evaluated)
+            if evaluated is True:
                 grouped[affected.vulnerability_id].append(affected)
         for cve_id, matched_evidence in grouped.items():
             specs = [row.affected_spec for row in matched_evidence]
@@ -109,6 +115,15 @@ def recalculate_findings(session, *, allow_disappearance=False, sla_days=None):
                                   if row.source == 'osv' else 'structured_affected_range'),
                  'matched_version': row.matched_version}
                 for row in matched_evidence][:30]
+            explicit_negative = sorted([
+                name for name, decisions in evaluated_by_source[cve_id].items()
+                if decisions and not any(decisions)])
+            positive = {row.source or 'cve_now' for row in matched_evidence}
+            evidence['range_disagreement_sources'] = (
+                explicit_negative if positive else [])
+            evidence['source_conflict'] = (
+                'potential_range_disagreement' if explicit_negative and positive
+                else 'none_observed')
             evidence['source_agreement'] = (
                 'multiple_reporting_paths_not_independent'
                 if len(evidence['reporting_sources']) > 1 else 'single_reporting_path')
