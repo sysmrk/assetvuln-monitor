@@ -23,6 +23,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   worker:
+    image: ${COMPOSE_PROJECT_NAME:-assetvuln-monitor-v03}-worker:latest
     # Match the host file owner so the unprivileged process can read mode-0600 token/config.
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     build:
@@ -99,6 +100,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   bootstrap:
+    image: ${COMPOSE_PROJECT_NAME:-assetvuln-monitor-v03}-worker:latest
     build:
       context: .
       dockerfile: docker/Dockerfile
