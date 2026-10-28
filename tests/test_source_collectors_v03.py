@@ -150,3 +150,30 @@ def test_first_csv_atomic_on_failed_stream():
         assert float(v.epss) == .6 and float(v.epss_percentile) == .98
         assert v.epss_asof is not None
     engine.dispose()
+
+
+
+def test_euvd_checkpoint_does_not_skip_dates_after_slow_backlog():
+    engine = _db()
+    class SlowProvider:
+        def page(self, start, end, page, size):
+            return ([{'id':f'EUVD-2026-1000{page}',
+                      'aliases':'CVE-2026-22222'}], 2)
+    first = datetime(2026, 10, 28, tzinfo=timezone.utc)
+    later = datetime(2026, 11, 10, tzinfo=timezone.utc)
+    with Session(engine) as db:
+        assert sync_euvd(db, {'page_size':1,'max_pages_per_cycle':1},
+                         provider=SlowProvider(), clock=first) == 1
+        db.commit()
+        checkpoint = db.get(FeedCheckpoint,'euvd')
+        assert checkpoint.state['start'] == '2026-10-21'
+        assert checkpoint.state['end'] == '2026-10-28'
+        assert sync_euvd(db, {'page_size':1,'max_pages_per_cycle':1},
+                         provider=SlowProvider(), clock=later) == 1
+        db.commit()
+        assert checkpoint.state['last_complete'].startswith('2026-10-28')
+        # A new polling window starts from the processed date, not Nov 10.
+        assert sync_euvd(db, {'page_size':1,'max_pages_per_cycle':1},
+                         provider=SlowProvider(), clock=later) == 1
+        assert checkpoint.state['start'] == '2026-10-26'
+    engine.dispose()
