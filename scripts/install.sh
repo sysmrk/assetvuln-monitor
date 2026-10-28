@@ -63,7 +63,7 @@ fi
 # Do not source .env as shell code: validate with Compose interpolation instead.
 required=(POSTGRES_PASSWORD APP_DB_PASSWORD REPORT_DB_PASSWORD MB_DB_PASSWORD METABASE_ADMIN_PASSWORD)
 for key in "${required[@]}"; do
-  value="$(docker compose config --format json 2>/dev/null | python3 -c '
+  value="$(docker compose --profile setup config --format json 2>/dev/null | python3 -c '
 import json,sys
 try:
     c=json.load(sys.stdin)
