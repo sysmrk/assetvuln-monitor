@@ -335,7 +335,43 @@ python3 scripts/check_compose_isolation.py \
 
 The baseline directory and its configuration must exist. The script reads Compose definitions; it does not start containers or migrate data.
 
-## 10. Dangerous commands to recognize
+## 10. What are the Python modules and infrastructure files? (optional reference)
+
+You **do not need to execute these Python files directly**. The installer and Worker call them automatically. This directory map is for maintainers and security reviewers who want to know where a behavior lives.
+
+| File | Responsibility |
+|---|---|
+| **avm/worker.py** | Main scheduled collection/correlation loop, source error isolation and notifications |
+| **avm/collectors.py** | Endpoint Central GET-only inventory and cve.now advisory reader |
+| **avm/source_collectors.py** | Bounded OSV QueryBatch, NVD/EUVD paginated public-source clients |
+| **avm/source_engine.py** | Canonical CVE aliases, provider-specific provenance and OSV version evidence/cache |
+| **avm/epss_csv.py** | FIRST official daily compressed CSV, numeric validation and local CVE updates |
+| **avm/threat_intel.py** | CISA KEV official ingestion and legacy small EPSS helper |
+| **avm/models.py** | PostgreSQL ORM schema, additive migrations and Metabase read-only views |
+| **avm/matching.py** | Conservative machine-readable affected-version matching |
+| **avm/normalization.py** | Normalized vendor/product labels and review-only similarity suggestions |
+| **avm/mapping_review.py** | Review record creation, approval/rejection constraints and audit events |
+| **avm/review_cli.py** | Operator commands for proposing and approving verified identities |
+| **avm/lifecycle.py** | Finding observation/reopening/review, risk calculation triggers and audit |
+| **avm/risk.py** | Scoring components, evidence formatting and read-only scenario simulation |
+| **avm/ops.py** | Prioritized queue, scenario CLI and explicit local risk acceptance |
+| **avm/asset_context.py** | Optional verified business importance/ownership/exposure YAML |
+| **avm/dashboards.py** | Definitions for nine Metabase dashboards and their read-only SQL questions |
+| **avm/bootstrap.py** | One-time account/database/collection/dashboard setup through Metabase API |
+| **avm/settings.py** | Application YAML validation and secure connection settings |
+| **avm/demo.py** | Fictional demo inventory and advisory fixtures; no corporate API calls |
+| **avm/health.py** | Minimal PostgreSQL health check for the Worker container |
+| **db/01-init.sh** | Creates PostgreSQL roles and Metabase DB **only when a fresh volume is initialized** |
+| **docker/Dockerfile** | Defines the Python Worker image and non-root process |
+| **docker/nginx/nginx.conf** | Default HTTPS reverse proxy to Metabase |
+| **docker-compose.yml** | The four-service stack, internal Docker networks and local volumes |
+| **.github/workflows/v03-quality.yml** | Synthetic unit/PostgreSQL/Compose/Docker and documentation checks |
+
+The application is designed as **one scheduled Worker**, not a collection of separate microservices. Changes to business logic do not require additional containers. For request flow and source-level evidence, read [Multi-source architecture](V03-MULTISOURCE.md) and [Security boundaries](SECURITY.md).
+
+---
+
+## 11. Dangerous commands to recognize
 
 | Command or action | Why to be careful |
 |---|---|
