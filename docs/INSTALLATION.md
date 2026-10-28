@@ -1,261 +1,309 @@
-# Installation and operations — Demo and Live
+# V2 installation — clear instructions for Demo and Live
 
-> **v0.1 technical preview.** Demo is suitable for WSL evaluation. Live mode is a read-only *integration preview*, not production-certified: the exact Endpoint Central on-prem API and cve.now structured affected-version responses have not been verified against a real deployment. Do not use matches as definitive vulnerability findings until integration and backport handling are validated.
+This guide is **only for develop/v0.2**. V2 is a development baseline that added verified mapping review and **seven Metabase dashboards**. The [V3 branch](https://github.com/sysmrk/assetvuln-monitor/tree/develop/v0.3) is the future product track with simpler automatic setup and more intelligence sources. **Do not run these V2 commands inside V1/main or V3 checkout directories.**
 
-## 0. Choose your mode
+**V2 important difference:** unlike V3, the V2 installer **requires you to create .env and generate passwords yourself**. It also does not have V3's strong automatic Demo/Live reuse guard; you must use separate Docker projects/volumes.
 
-| | Demo / test | Live / production-data integration |
-|---|---|---|
-| Install command | `./install.sh --demo` | `./install.sh --live` |
-| Inventory | 10 synthetic hosts | Endpoint Central on-prem inventory |
-| Vulnerabilities | Synthetic CVE-DEMO records | Live cve.now feed (limited recent pages) |
-| Matching | Enabled on synthetic records | Enabled, conservative / verified mappings only |
-| ManageEngine token | Not required | Read-only inventory token required |
-| Writes to managed assets | **Never** | **Never** |
-| Metabase dashboards | Automatically provisioned | Automatically provisioned |
-| Production approved | No; testing only | **Not yet; validate before production use** |
+## 0. Prerequisites — start here
 
-**Do not switch an existing demo database to live mode.** Synthetic demo records persist in the database. Use a separate fresh deployment/database for real inventory. **Warning:** give each instance a distinct `COMPOSE_PROJECT_NAME`, `HTTPS_PORT`, database volume namespace and checkout. The v0.2 default project name is `assetvuln-monitor-v02`; for two v0.2 instances, change one of them.
+You need Ubuntu/Linux (or WSL2 Ubuntu), Docker Engine/Desktop running, **Docker Compose v2**, Git, Python 3 and OpenSSL.
 
-## 1. Prerequisites — Ubuntu 24.04 / WSL2
+Open the Ubuntu/Linux terminal and run:
 
-Open an Ubuntu terminal. Install Docker Engine if missing, or use Docker Desktop with WSL integration. If Docker Engine is already installed and `docker info` succeeds, **do not reinstall it**.
-
-Check the environment (read-only):
-
-```bash
-cat /etc/os-release
+~~~bash
 docker --version
-docker info --format '{{.ServerVersion}}'
 docker compose version
+docker info --format '{{.ServerVersion}}'
 git --version
+python3 --version
 openssl version
-```
+~~~
 
-The project requires **Docker Compose v2**, invoked as `docker compose` (with a space). Legacy `docker-compose` v1 is not supported. On Ubuntu 24.04 with Docker already installed, add the Ubuntu Compose v2 package if necessary:
+**Success:** you see versions, including a **Docker server version**. If Docker is missing, follow its [official Ubuntu setup](https://docs.docker.com/engine/install/ubuntu/) or [Docker Desktop Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/). For a step-by-step Ubuntu setup, see [V3's reusable prerequisite guide](https://github.com/sysmrk/assetvuln-monitor/blob/develop/v0.3/docs/INSTALLATION.md#0-before-installing-what-you-need).
 
-```bash
-sudo apt update
-sudo apt install -y docker-compose-v2 git openssl
-docker compose version
-docker info --format '{{.ServerVersion}}'
-```
+**Do not reinstall an already working Docker Engine.** The supported command is **docker compose**, with a space, not legacy docker-compose.
 
-If `docker-compose-v2` is not available in your configured repositories, stop and check your Ubuntu/Docker package sources rather than replacing a working Docker Engine blindly. For Docker's official repository, the equivalent plugin package is typically `docker-compose-plugin`. Allow approximately 4 GB of memory for the stack.
+## Part A — run the Demo
 
-## 2. DEMO — complete commands (no ManageEngine needed)
+Demo is the safest way to see the platform. It uses **fictional assets and CVE-DEMO identifiers**; no Endpoint Central account or token is required.
 
-```bash
-# Download the standalone repository:
-cd /opt/src
+### A1. Clone V2 into a dedicated directory
+
+~~~bash
+mkdir -p "$HOME/projects"
+cd "$HOME/projects"
 git clone --branch develop/v0.2 https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-v02
 cd assetvuln-monitor-v02
+git branch --show-current
+~~~
+
+**Expected:** develop/v0.2.
+
+### A2. Create and fill private .env
+
+~~~bash
 cp example.env .env
-nano .env  # replace every CHANGE_ME_* with a unique strong secret
+id -u
+id -g
+nano .env
+~~~
 
-# Confirm runtime availability:
-docker compose version
-docker info --format '{{.ServerVersion}}'
+**Look at all five password lines**. V2 requires replacing the **CHANGE_ME_*** values with different random passwords. In another terminal, generate a random value:
 
-# Build and start Docker services using your configured .env, create local TLS,
-# populate synthetic data, and provision the Metabase dashboards:
+~~~bash
+openssl rand -hex 30
+~~~
+
+Copy the output **privately** into one of the five .env password fields, then repeat **five times**, using a different generated value for each:
+
+- POSTGRES_PASSWORD
+- APP_DB_PASSWORD
+- REPORT_DB_PASSWORD
+- MB_DB_PASSWORD
+- METABASE_ADMIN_PASSWORD
+
+If **id -u** or **id -g** from the previous step does not say **1000**, edit **HOST_UID** and **HOST_GID** to match your actual numeric output.
+
+**Keep/verify** these exact Demo settings:
+
+~~~dotenv
+COMPOSE_PROJECT_NAME=assetvuln-monitor-v02
+BIND_IP=127.0.0.1
+HTTPS_PORT=8444
+PUBLIC_URL=https://localhost:8444
+PRODUCT_MAPPINGS_FILE=./config/product-mappings.yaml
+~~~
+
+Save in **nano** with **Ctrl+O**, Enter and **Ctrl+X**, then protect the file:
+
+~~~bash
+chmod 600 .env
+~~~
+
+**Do not share or commit .env.** A configured .env cannot be replaced by the example file after the database has initialized without risking broken authentication.
+
+### A3. Start V2 Demo
+
+~~~bash
 ./install.sh --demo
+~~~
 
-# Check containers and logs:
+The installer checks Docker/credentials, creates local app YAML and localhost TLS if missing, starts PostgreSQL, Worker, Metabase and NGINX, and runs a temporary Bootstrap job to create the reporting connection and dashboards.
+
+**Success:** you see the installation-finished message. If you get a setup/credential error, check that **every CHANGE_ME_*** was replaced and **.env** is valid. Do not delete the database volume to retry.
+
+### A4. Verify and sign in
+
+~~~bash
 docker compose ps
 docker compose logs --tail=100 worker
 docker compose logs --tail=100 metabase
-docker compose logs --tail=100 nginx
+~~~
 
-# Show the configured Metabase login (do not paste passwords in tickets):
+Expected: **postgres**, **worker**, **metabase** and **nginx** running. The one-shot bootstrap container need not keep running.
+
+Open **https://localhost:8444** on the same computer. The self-signed localhost certificate warning is expected for this local test. Find your own login credentials:
+
+~~~bash
 grep '^METABASE_ADMIN_EMAIL=' .env
 grep '^METABASE_ADMIN_PASSWORD=' .env
-```
+~~~
 
-Open **https://localhost:8444** on the WSL host browser. The automatically generated localhost certificate is self-signed, so a browser warning is expected in the demo. The seven dashboards are automatically provisioned by the bootstrap container. Synthetic advisories are labeled `CVE-DEMO-*` and are not real CVEs.
+Log in to Metabase and find the **AssetVuln Monitor · Security Workspace** collection. V2 provides **seven dashboards**, numbered 01–07.
 
-Useful operational commands:
+### A5. Stop and restart without losing data
 
-```bash
-docker compose ps                     # container status
-docker compose logs -f worker         # follow ingestion/matching
-docker compose logs -f metabase       # follow Metabase
-docker compose stop                   # stop, keep persistent data
-docker compose start                  # restart, keep persistent data
-./scripts/backup.sh                   # backup PostgreSQL and Metabase data
-./install.sh --demo                   # rerun idempotent setup
-```
+~~~bash
+docker compose stop
+docker compose start
+~~~
 
-**Do not run `docker compose down -v` casually:** `-v` removes persistent volumes and destroys local application/Metabase data.
+**Do not run docker compose down -v**. The flag removes the Docker named volume with application and Metabase databases.
 
-## 3. LIVE — real Endpoint Central integration (separate fresh installation)
+---
 
-Prefer a separate Docker host for initial Live validation. If sharing a daemon, use a unique `COMPOSE_PROJECT_NAME` and HTTPS port distinct from v0.1 and any running v0.2 Demo installation. Review [v0.2 isolation](V02-ISOLATION.md) and run the Compose collision checker before starting services. Example on a fresh dedicated host:
+## Part B — connect real inventory (Live)
 
-```bash
-sudo mkdir -p /opt/assetvuln-live
-sudo chown "$(id -u):$(id -g)" /opt/assetvuln-live
-cd /opt/assetvuln-live
-git clone --branch develop/v0.2 https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-v02
-cd assetvuln-monitor-v02
+**Do not change the existing V2 Demo to Live in place.** Create a new checkout, new **COMPOSE_PROJECT_NAME**, new port and a fresh Docker volume. V2 does **not** automatically prevent mode reuse the way V3 does.
+
+### B1. Create a new isolated checkout
+
+~~~bash
+cd "$HOME/projects"
+git clone --branch develop/v0.2 https://github.com/sysmrk/assetvuln-monitor.git assetvuln-monitor-v02-live
+cd assetvuln-monitor-v02-live
 cp example.env .env
-nano .env  # set unique COMPOSE_PROJECT_NAME, HTTPS_PORT, passwords and PUBLIC_URL
+nano .env
+~~~
 
-# Create the runtime YAML from the documented template:
+Replace **all five CHANGE_ME_*** placeholders with **five different random passwords** (use **openssl rand -hex 30** as in Demo A2). Set **HOST_UID/HOST_GID** from **id -u** and **id -g**.
+
+**Choose a new project and port, separate from the V2 Demo and V1/V3:**
+
+~~~dotenv
+COMPOSE_PROJECT_NAME=assetvuln-monitor-v02-live
+BIND_IP=127.0.0.1
+HTTPS_PORT=8454
+PUBLIC_URL=https://localhost:8454
+PRODUCT_MAPPINGS_FILE=./config/product-mappings.live.yaml
+METABASE_ADMIN_EMAIL=admin@your-company.example
+~~~
+
+Change the email to your own, then:
+
+~~~bash
+chmod 600 .env
+~~~
+
+### B2. Set the real Endpoint Central URL
+
+~~~bash
 cp config/application.example.yaml config/application.yaml
-
-# Edit runtime configuration:
 nano config/application.yaml
-```
+~~~
 
-Edit the following fields in `config/application.yaml` (use spaces, not tabs):
+Change only the existing **application.mode** and **manageengine.url** values:
 
-| YAML field | Example / required action |
-|---|---|
-| `application.mode` | `live` |
-| `application.timezone` | `Asia/Tehran` or your actual timezone |
-| `manageengine.url` | `"https://endpoint.example.org:8383"` — base URL only, **not** an API path |
-| `manageengine.token_file` | Leave `/run/secrets/manageengine_token` |
-| `manageengine.verify_tls` | Keep `true` |
-| `manageengine.ca_bundle` | `""` for publicly trusted TLS, or `"/opt/avm/certs/org-ca.pem"` for internal CA |
-| `manageengine.sync_minutes` | `360` (every 6 hours) |
-| `manageengine.max_assets` | `10000` (adjust only after assessing inventory size) |
-| `manageengine.max_pages` | `500` (pagination safety limit) |
-| `cve.url` | `"https://cve.now"` (default) |
-| `cve.sync_minutes` | `30` |
-| `cve.max_pages_per_poll` | `5` (limited recent-page polling, **not full CVE history**) |
-| `cve.request_timeout_seconds` | `30` |
-| `matching.mappings_file` | Leave `/opt/avm/config/product-mappings.yaml` |
-| `notifications.email_enabled` | `false` until SMTP has been reviewed and tested |
+~~~yaml
+application:
+  mode: live
+  timezone: UTC
 
-**Do not paste your API token into YAML or Git.** Create its separate local secret file:
+manageengine:
+  url: "https://endpoint.your-company.example:8383"
+  token_file: /run/secrets/manageengine_token
+  verify_tls: true
+  ca_bundle: ""
+  sync_minutes: 360
+  max_assets: 10000
+  max_pages: 500
+~~~
 
-```bash
+The URL above is a **placeholder**. Insert your actual Endpoint Central on-premises **HTTPS base URL without /dcapi**. Keep the other existing YAML sections.
+
+**Important for larger organizations:** if more than 10,000 assets are approved for inventory, increase **max_assets** first; it is a hard safety cap. Adjust pagination only with verified Endpoint Central API behavior.
+
+### B3. Store the read-only API token
+
+~~~bash
 mkdir -p secrets/certs secrets/tls
 nano secrets/manageengine_token
-chmod 600 secrets/manageengine_token config/application.yaml
-```
+chmod 600 secrets/manageengine_token
+~~~
 
-Paste **only** the read-only Endpoint Central API token into `secrets/manageengine_token`, save and close. Use an account restricted to inventory read access; no patch deployment, remote execution or administrator rights.
+Paste only your company's **least-privilege inventory read token** into the file. Never use an Endpoint Central administrator token if read-only access is possible. Never put the token in application.yaml, a screenshot or Git.
 
-If Endpoint Central uses an internal certificate authority, copy the trusted CA PEM into `secrets/certs/org-ca.pem` and set `manageengine.ca_bundle` as shown above. Never set `verify_tls: false` to bypass certificate verification.
+If Endpoint Central uses an internal CA, copy the CA certificate to **secrets/certs/org-ca.pem** and set **manageengine.ca_bundle** to **"/opt/avm/certs/org-ca.pem"** inside the YAML. Do not turn TLS verification off.
 
-### Why product mappings differ between Demo and Live
+### B4. Test the real API before installing
 
-`config/product-mappings.yaml` contains **two fake demo identities**, corresponding to the synthetic inventory and synthetic CVEs. They are not verified mappings for your organization. For Live, use the separate `config/product-mappings.live.yaml` (initially `products: []`) and set `PRODUCT_MAPPINGS_FILE=./config/product-mappings.live.yaml` in `.env`. The empty default means software is inventoried but no unverified CVE matches are generated.
+For publicly trusted TLS:
 
-For real findings, edit the live mapping file and add `vendor` and `name` **exactly as reported by Endpoint Central**, plus `ecosystem` and `package` **verified against the advisory**. Case is ignored for vendor/name, but fuzzy similarity is not used. Example of YAML **structure only** (not a valid preapproved mapping):
-
-```yaml
-products:
-  - vendor: "Verified Vendor From Inventory"
-    name: "Verified Product From Inventory"
-    ecosystem: "PyPI"
-    package: "verified-package-from-advisory"
-```
-
-Do not assume that desktop software shares the identity or affected versions of a similarly named npm/PyPI package. See [configuration reference](CONFIGURATION.md#software-identity-mappings).
-
-### ManageEngine API preflight — run before Live install
-
-After setting `manageengine.url` in `config/application.yaml` and adding the read-only token to `secrets/manageengine_token`, run:
-
-```bash
+~~~bash
 python3 scripts/test_manageengine_api.py
-# If needed, specify a known computer:
-python3 scripts/test_manageengine_api.py --resource-id 12345
-# For internal CA certificates:
+~~~
+
+For your own internal CA:
+
+~~~bash
 python3 scripts/test_manageengine_api.py --ca-bundle secrets/certs/org-ca.pem
-```
+~~~
 
-The test **prints the two GET API paths** before running, then reports PASS/FAIL/SKIP, response time and first-page record counts. It runs without Docker or database, does not modify assets and never prints the token or full JSON. A PASS is a limited smoke test; it does not prove pagination and all field schemas are compatible. Investigate FAIL/SKIP before starting Live.
+**Expected:** both **scanComputers** and **softwareInfo** report **PASS**. The script sends GET requests only, and does not modify assets. If it fails, fix access/certificate/schema first; the test does not guarantee all pages of a large inventory work.
 
+### B5. Install and open Live
 
-
-Start live mode **after the independent API test**:
-
-```bash
+~~~bash
 ./install.sh --live
 docker compose ps
-docker compose logs --tail=200 worker
-docker compose logs --tail=200 metabase
-```
+docker compose logs --tail=120 worker
+~~~
 
-For a network-facing deployment, configure `BIND_IP`, `HTTPS_PORT` and `PUBLIC_URL` in `.env` **before running the installer**; install a trusted certificate and matching private key at `secrets/tls/tls.crt` and `secrets/tls/tls.key` before starting. The default bind is loopback only. The default `BIND_IP=127.0.0.1` exposes HTTPS only on the local host. Restrict firewall access and validate Metabase authentication.
+On the same machine, open **https://localhost:8454**. Use the Metabase credentials from the **Live checkout's** private .env.
 
-### Administrator-configured `.env` — fields and security
+**If Live shows assets but zero Findings, that is not automatically an error.** The approved Live mapping catalogue starts empty to avoid guessing package identities. You must verify a product and approve its mapping before a structured CVE/version match can generate a Finding.
 
-Create `.env` yourself with `cp example.env .env`, replace **all** `CHANGE_ME_*` placeholders with independent strong secrets (e.g. `openssl rand -hex 30`), and set `HOST_UID`/`HOST_GID` to the installing user's numeric IDs (`id -u`, `id -g`). The installer validates required credentials and never overwrites `.env`:
+Read [Mapping Review](MAPPING-REVIEW.md) for the proposal and approval steps. V2 only uses **cve.now** for advisory ingestion; V3 has additional OSV/NVD/EUVD/FIRST/CISA sources.
 
-| Variable | Purpose |
+---
+
+## 3. What gets installed?
+
+~~~mermaid
+flowchart LR
+    EC["Endpoint Central<br/>GET-only"] --> W["V2 Worker"]
+    C["cve.now"] --> W
+    W --> DB[("PostgreSQL<br/>inventory, mapping audit, evidence")]
+    DB --> M["Metabase<br/>seven dashboards"]
+    M --> N["NGINX HTTPS<br/>localhost"]
+~~~
+
+| Container | Purpose |
 |---|---|
-| `COMPOSE_PROJECT_NAME` | Must be unique per installation; e.g. `assetvuln-monitor-v02-live` if Demo already exists on this Docker host |
-| `HOST_UID` / `HOST_GID` | Host owner used by non-root worker to read mode-0600 secrets |
-| `POSTGRES_PASSWORD` | Internal PostgreSQL administrator credential |
-| `APP_DB_PASSWORD` | Application database credential |
-| `REPORT_DB_PASSWORD` | Metabase read-only reporting connection credential |
-| `MB_DB_PASSWORD` | Metabase application database credential |
-| `METABASE_ADMIN_EMAIL` | Initial Metabase administrator email (set a real one before first bootstrap) |
-| `METABASE_ADMIN_PASSWORD` | Initial Metabase administrator password |
-| `BIND_IP` | Host bind IP; default `127.0.0.1` |
-| `HTTPS_PORT` | External HTTPS port; v0.2 default `8444` (use a different port for every instance) |
-| `PUBLIC_URL` | User-facing URL; default `https://localhost:8444` |
+| postgres | Stores the AVM and Metabase databases |
+| worker | Reads inventory + cve.now, correlates approved software identities |
+| metabase | Dashboards / read-only report views |
+| nginx | HTTPS entry point |
+| bootstrap (temporary) | Creates Metabase account/reports and then exits |
 
-**Changing database passwords after the first initialization does not automatically rotate PostgreSQL role passwords.** For existing installations, use a tested rotation procedure instead of blindly editing `.env`. Keep `.env`, API tokens, and private keys outside version control.
+## 4. What do the seven dashboards show?
 
-### Optional email alerts
+| Dashboard | What to check |
+|---|---|
+| 01 Security Command Center | Fleet counts and potential matches |
+| 02 Asset Explorer | Host, OS, domain and freshness |
+| 03 Software Catalog | Product/vendor/version; unmapped identities |
+| 04 Vulnerability Intelligence | Received cve.now advisory catalogue |
+| 05 Affected Assets & Evidence | Structured potential CVE-to-host matches |
+| 06 Pipeline Health & Coverage | Sync failures and missing data |
+| 07 Mapping Quality & Review | Coverage, pending proposal and decision audit |
 
-In `config/application.yaml`, set `notifications.email_enabled: true`, then set `notifications.smtp_host`, `smtp_port`, `smtp_starttls`, `sender`, and `recipients`. Authentication uses `SMTP_USER` and `SMTP_PASSWORD` if supported by your deployment environment. Review SMTP credential injection before enabling in production; do not assume adding variables to `.env` alone wires them into every container.
+No dashboard is a patching or exploit-execution interface. Metabase queries AVM's **read-only reporting schema**.
 
-## ManageEngine API smoke test — command reference
+## 5. Your daily commands
 
-Run this **before** starting containers to verify that the current Endpoint Central deployment accepts the two API calls used by `avm/collectors.py`:
+**Run from the V2 checkout you intend to manage:**
 
-```bash
-# Set manageengine.url in config/application.yaml first.
-# Put the read-only API token in secrets/manageengine_token.
-python3 scripts/test_manageengine_api.py
-# Optional: python3 scripts/test_manageengine_api.py --resource-id 12345
-# Optional custom CA: python3 scripts/test_manageengine_api.py --ca-bundle secrets/certs/org-ca.pem
-```
-
-The script lists the two GET endpoints at startup, validates JSON list shapes, prints PASS/FAIL/SKIP, and never prints the API token or full response. It does not write to ManageEngine, start Docker, or modify the database. Only page one and one selected computer are tested; successful output does not establish full pagination or field compatibility.
-
-## v0.2 offline software normalization
-
-Once an inventory CSV export is available, run `python3 scripts/suggest_mappings.py --inventory-csv /secure/path/software.csv --approved-mappings config/product-mappings.live.yaml --output mapping-review.json` to generate **review-only** candidate suggestions and mapping coverage counts. This does not contact ManageEngine or modify approved mappings. See [Software normalization](SOFTWARE-NORMALIZATION.md). To check v0.1/v0.2 Compose isolation, run `python3 scripts/check_compose_isolation.py --baseline-dir /path/to/v01 --candidate-dir .`.
-
-## v0.2 review workflow and Data Quality dashboard
-
-After the v0.2 Worker initializes the database, the seventh Metabase dashboard **07 · Mapping Quality & Review** is provisioned by bootstrap. It shows Mapping coverage, known data gaps, audit history and pending human review. The default Live mapping file remains empty until identities are verified.
-
-```bash
-# Read-only pending proposals:
-docker compose exec worker python -m avm.review_cli list --status pending
-# Read-only history (replace 12 with an actual review ID):
-docker compose exec worker python -m avm.review_cli history --review-id 12
-```
-
-Manual proposal/approve/reject operations require a privileged operator with direct access to the Worker container and database. They **write only to application mapping-review tables**, never to Endpoint Central. Verify package identities, require a distinct reviewer for manual proposals, and inspect the result at the **next successful inventory sync**. See [complete mapping-review workflow](MAPPING-REVIEW.md) for exact commands, limitations and security boundaries. Do not expose the privileged CLI as a public HTTP endpoint.
-
-## 4. Verification and limitations
-
-```bash
+~~~bash
 docker compose ps
-docker compose logs --tail=150 worker
-docker compose logs --tail=150 metabase
-```
-
-Demo success criteria: 10 synthetic assets, seven dashboards, software installations and labeled `CVE-DEMO-*` records, without duplicate dashboards after a second install. Live success criteria: valid read-only API access, realistic inventory counts, verified pagination and software versions, successful advisory collection, and reviewed correlation evidence. A green container alone does **not** prove source compatibility.
-
-**Current limitations:** on-premises Endpoint Central only (cloud API not implemented), limited cve.now recent polling (no complete historical backfill), conservative package identity matching, and no generic CPE/backport verification. Neither mode modifies any managed asset.
-
-## 5. Backups and restoration
-
-```bash
+docker compose logs --tail=100 worker
+docker compose exec -T worker python -m avm.review_cli list --status pending
 ./scripts/backup.sh
-# Review backup directory before recovery:
-./scripts/restore.sh /path/to/backup-directory
-```
+docker compose stop
+docker compose start
+~~~
 
-Restore overwrites database contents and requires explicit confirmation. Test in staging first.
+**Mapping workflow:** find exact product/vendor in dashboard 03, verify the authoritative package identity, manually propose it and have a separate reviewer approve it. Example propose command (all strings are placeholders):
+
+~~~bash
+docker compose exec -T worker python -m avm.review_cli propose \
+  --vendor "Exact Vendor" --name "Exact Software" \
+  --ecosystem "PyPI" --package "verified-package" \
+  --actor "analyst-1" \
+  --evidence "Verified official package identity"
+~~~
+
+Use the returned ID, e.g. **12**:
+
+~~~bash
+docker compose exec -T worker python -m avm.review_cli approve \
+  --id 12 --actor "reviewer-2" \
+  --reason "Independent validation of exact vendor and package identity"
+~~~
+
+Approved mappings take effect at the next successful inventory synchronization. The CLI updates **only local AVM DB tables**, never Endpoint Central.
+
+## 6. Backups, isolation and remaining limitations
+
+~~~bash
+./scripts/backup.sh
+docker compose config --quiet
+~~~
+
+**Backup script stores AVM and Metabase PostgreSQL dumps only**. Securely back up local .env, token, private YAML and TLS certs separately. Restore is destructive and requires explicit confirmation; practice in staging before use.
+
+V2 defaults to **assetvuln-monitor-v02** and HTTPS **8444**. V1/main has a different Compose identity and V3 uses its own. [V2 isolation details](V02-ISOLATION.md) describe how to check independent Docker resources before running both versions.
+
+**Current limitations:** only on-premises Endpoint Central API is targeted; cve.now polling covers bounded recent pages, not an entire historical CVE archive; CPE/backport auto-validation is unsupported; software mapping decisions have self-reported actor identifiers without SSO; live corporate integration and a full Docker smoke test for the V2 branch are not verified.
+
+If the goal is to **evaluate the newer, easier product**, use [V3's guided installation](https://github.com/sysmrk/assetvuln-monitor/blob/develop/v0.3/docs/INSTALLATION.md).
