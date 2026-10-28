@@ -1,173 +1,207 @@
-# V3 Multi-Source Vulnerability Intelligence
+# How the six vulnerability-intelligence sources work
 
-**Simple setup:** run the existing ./install.sh --demo or --live. Existing four
-containers, one Worker and one PostgreSQL volume remain unchanged. No new
-credentials are mandatory. Public-source fetching is automatic in Live mode.
+**One inventory. Multiple evidence sources. One explainable decision.**
 
-## Why six sources rather than six scanners?
+This is the complete architecture and operator explanation of V3's multi-source feature. It does **not** require setting up six scanners. The existing Python Worker automatically talks to the configured public providers, stores evidence in the existing PostgreSQL database, and presents the result in Metabase.
 
-Endpoint Central collects installed software **once**. The Worker correlates
-that inventory with **four advisory sources** and **two threat-priority sources**:
+If you only want to install the product, start with the [beginner guide](INSTALLATION.md). Everything in this page is designed to clarify the *meaning* and *trustworthiness* of its results.
 
-| Source | What it contributes | Does it independently create an asset Finding? |
+## The 60-second explanation
+
+~~~mermaid
+flowchart TD
+    EC["Endpoint Central<br/>one inventory collection"] --> INV["Assets + installed software in PostgreSQL"]
+    INV --> MAP{"Exact package identity approved?"}
+    MAP -- No --> U["Unmapped / needs review<br/>No guessed Finding"]
+    MAP -- Yes --> DUP["Unique ecosystem + package + version"]
+    DUP --> OSV["OSV QueryBatch<br/>package/version matches"]
+    CVE["cve.now<br/>advisory feed"] --> E["Structured evidence store"]
+    OSV --> E
+    NVD["NVD CVE metadata/CVSS"] --> E
+    EUVD["EUVD supplemental advisories"] --> E
+    E --> COR{"Supported version evidence?"}
+    COR -- No --> INT["Advisory record only"]
+    COR -- Yes --> FIND["One potential Finding<br/>per installation + canonical advisory"]
+    FIRST["FIRST EPSS"] --> R["Risk priority + provenance"]
+    KEV["CISA KEV"] --> R
+    FIND --> R
+    R --> MB["Metabase: nine dashboards"]
+~~~
+
+**Important:** a source telling us that a CVE exists is not the same as a source proving that a particular installed version is affected. The code makes that distinction explicitly.
+
+## 1. What is each provider responsible for?
+
+| Provider | Role | Can it support a version-based Finding on its own? | Notes |
+|---|---|---|---|
+| **cve.now** | Recent aggregated advisory discovery | **Yes**, with a reviewed package identity and supported structured version range | Aggregated data may originate upstream in OSV/GHSA/NVD |
+| **OSV.dev** | Exact package/ecosystem/version lookup | **Yes**, for the queried version when a detailed advisory confirms package identity | Uses public HTTPS POST QueryBatch for a **read-only lookup** |
+| **NVD / NIST** | CVE metadata, selected CVSS and reference identifiers | **Not in current implementation** | CPE configuration applicability is not yet evaluated with verified package mapping |
+| **ENISA EUVD** | European vulnerability identifiers, explicit CVE aliases and supplemental metadata | **Not in current implementation** | Free-text affected-product descriptions are not treated as exact package evidence |
+| **FIRST EPSS** | Statistical exploit-likelihood score and percentile | **No** | Probability of exploitation over a 30-day horizon; prioritization only |
+| **CISA KEV** | List of vulnerabilities known exploited in the wild | **No** | Prioritization only; being listed does not identify a local affected installation |
+
+The wording **"reported via"** matters: cve.now may incorporate the same upstream record as OSV. Two feeds are **not necessarily two independent confirmations**.
+
+## 2. Who decides if only one provider reports a CVE?
+
+**The correlation engine decides**, not a global provider ranking. We use **union with valid version evidence**:
+
+| What happened? | AVM's decision | Why |
 |---|---|---|
-| cve.now | Broad recent advisory discovery and machine-readable affected ranges | Yes, only with exact approved package identity + supported version range |
-| OSV.dev | Explicit package/ecosystem/version lookup, aliases and fix events | Yes, for the exact mapped package/version returned by querybatch, after detail verification |
-| NVD 2.0 | Authoritative CVE metadata and preferred CVSS | **No**: CPE applicability requires separate trusted CPE mappings and AND/OR evaluation |
-| ENISA EUVD | Independent EUVD record IDs, explicit CVE aliases and supplemental CVSS | **No**: product text/ranges are not translated into guaranteed package-version evidence |
-| FIRST EPSS | Daily exploit-likelihood probability and percentile for known CVEs | No; prioritization only |
-| CISA KEV | Verified catalog of vulnerabilities known exploited in the wild | No; prioritization only |
+| Only OSV returns a matching package/version advisory | Potential Finding | Exact approved identity and queried version evidence |
+| Only cve.now provides a supported affected version range | Potential Finding | Structured match is sufficient |
+| Both report the **same canonical CVE** for that installed version | **One Finding** with two evidence paths | Prevent duplicate host/CVE records |
+| NVD reports a CVE but no trusted package-to-CPE applicability exists | Advisory metadata only | Existence of a CVE is not a host match |
+| EUVD reports a vulnerability but only free-text product data | Advisory metadata only | Free text cannot safely prove affectedness |
+| FIRST has EPSS but package applicability is unknown | Score metadata, no new Finding | EPSS is not a detector |
+| CISA lists a CVE in KEV but installed version is unverified | KEV enrichment, no new Finding | Exploitation signal is not package evidence |
+| One source is silent, another has valid evidence | Keep the potential Finding | **Silence is not a negative vote** |
+| One explicit comparable version range conflicts with another | Keep the Finding and flag a **range disagreement** | Requires human vendor validation |
+| OSV withdraws/retracts previous evidence | Preserve history; require review if still installed | A source change does not prove the host was patched |
+| A public API fails or returns incomplete pages | Keep last valid data; log failure | No false remediation due to source outage |
 
-Some feeds reuse the same upstream OSV/CVE/GHSA data. Seeing the same record
-via two transports is not two independent vendor confirmations.
+**Finding is always potential**, not proof of a patched/unpatched target. A distro backport may have already fixed the real installed build.
 
-**Detection policy: union-with-evidence.** Either cve.now or OSV can support a
-*potential* Finding on its own. One source being absent/silent is NOT a
-negative vote. NVD/EUVD metadata and EPSS/KEV cannot independently convert
-a software installation into a Finding. No fuzzy software matching is used.
+## 3. Does the Worker check every Asset six times?
 
-## No double-scanning at enterprise scale
+**No.** Endpoint Central inventory collection happens once on its own schedule. The different data sources operate on a local snapshot or public CVE identifiers.
 
-Only approved unique triples (ecosystem, package name, installed version) are
-sent to OSV; hostnames/IP addresses/asset source IDs are **never** included.
-All installations using the same package/version reuse the cached result.
-OSV QueryBatch uses batches of up to 50 and limits work to four batches per
-20-minute cycle by default; these are *operator-tunable budgets*, not claims
-about global OSV API rate limits. Pagination is followed per query until
-complete; malformed, repeated-token or partial responses are rejected.
+For **OSV**, the Worker extracts distinct, already-approved tuples:
 
-The cache persists in PostgreSQL with a 24-hour TTL for *both positive and
-negative* results. The Worker periodically rechecks unchanged packages so
-freshly published advisories can still be discovered. Detailed OSV records
-are reused when the upstream modified timestamp is unchanged.
+**ecosystem + package_name + installed_version**
 
-The API uses HTTPS **POST** to /v1/querybatch for read-only lookup; this
-does not mutate OSV data or any managed endpoint. All Endpoint Central
-requests remain HTTPS **GET-only**.
+Example (illustrative, not a performance claim):
 
-## How are duplicate advisories resolved?
+| Inventory | Count |
+|---|---:|
+| Managed assets | 100,000 |
+| Total software installations | 5,000,000 |
+| Distinct approved package/version combinations | 20,000 |
+| OSV lookups required for the *first* sweep | 20,000, **not 5 million** |
 
-- One explicit CVE alias: use that CVE as the canonical vulnerability ID.
-- An advisory without a CVE alias: retain its original OSV/EUVD ID.
-- Multiple conflicting CVE aliases: do not automatically merge or guess.
-- Existing source identity that acquires a new CVE alias: preserve its
-  previous canonical association until an explicitly reviewed migration.
-- The Finding table's existing installation_id + vulnerability_id uniqueness
-  continues to enforce only one Finding for an identical canonical CVE.
-- Per-source IDs, aliases, original advisory URLs, fetched/modified dates,
-  and affected-version evidence remain separate in source tables.
+Default batch budget: **50 tuples per batch × 4 batches per 20-minute cycle = up to 200 unique tuples per cycle**. Therefore an initial full sweep over 20,000 different tuples could take many cycles (roughly 100 cycles, **about 33 hours** if every cycle reaches the full budget, with no retries or pagination overhead). Real capacity depends on API latency, source rate limits, local database performance and approved mapping coverage.
 
-**Current limitation:** changing aliases over time may require deliberate
-manual reconciliation. We deliberately do not silently rewrite old Finding
-foreign keys or assume two similar GHSA/EUVD records are the same issue.
+**This is not an enterprise-scale benchmark.** With a very large fleet, also increase **manageengine.max_assets** from its safe initial 10,000 cap and validate Endpoint Central's per-device API cost. Do not increase budgets without staging tests.
 
-## Source disagreement, removal and lifecycle
+### Why the OSV cache matters
 
-1. If cve.now alone has usable version evidence, generate a potential Finding.
-2. If OSV alone returns a matching package/version, generate a potential
-   Finding with the specific lookup identity and exact queried version.
-3. If both refer to the same canonical CVE, preserve both evidence rows; emit
-   one Finding for that installation/CVE and display both reporting paths.
-4. A source returning no records is **not** proof of a patch. Previously
-   returned OSV evidence is marked retracted for analyst review, not deleted.
-5. When the installation still exists but no current positive version
-   evidence remains, keep the Finding active and set needs_review.
-6. Only the disappearance of that installation after an explicitly successful
-   full inventory can produce not_observed; still not a proven remediation.
-7. Failed/partial source requests never overwrite the last successful
-   source evidence or close findings.
+~~~mermaid
+flowchart TD
+    P["Approved unique package/version"] --> C{"Valid cached result<br/>younger than 24h?"}
+    C -- Yes --> REUSE["Reuse local PostgreSQL evidence"]
+    C -- No --> Q["HTTPS POST /v1/querybatch"]
+    Q --> PG{"All pages/details<br/>valid and complete?"}
+    PG -- Yes --> SAVE["Store cache, source IDs,<br/>match evidence and timestamp"]
+    PG -- No --> KEEP["Keep previous data<br/>record failure"]
+    SAVE --> REUSE
+~~~
 
-When two machine-comparable affected ranges for the same approved package
-and installed version disagree explicitly, the Finding stays active and
-source_conflict is set to potential_range_disagreement. Silence and absence
-from a feed are never counted as disagreement. The ninth Metabase dashboard
-has review queues for explicit range disagreements and source retractions;
-neither can be resolved automatically by majority vote.
+Both **positive** and **negative** cache entries expire and are refreshed. A cached "no result" means **no record returned at that check time**, not proof that the software is safe forever.
 
-## NVD and EUVD delta collection
+The Worker follows per-query pagination, rejects incomplete/malformed batch results and caches detailed OSV records using the upstream modification timestamp when available.
 
-NVD uses the documented CVE API 2.0 modified-date window, a short overlap,
-offset pagination, and a durable checkpoint. EUVD uses ENISA's dated,
-paged vulnerability listing and a 2-day overlap; EUVD's date filter covers
-published records rather than all historic modifications. Both sources
-process a limited page budget and resume large, unfinished windows without
-losing place. The initial lookbacks are 48 hours for NVD and 7 days for EUVD;
-**neither is a full historical mirror**.
+**Privacy:** OSV sees the approved **package name, ecosystem and version**, **not hostname, IP, source ID or business owner**. Package names/versions can still be confidential technology-stack information; approve outbound sharing before Live deployment.
 
-NVD has source-specific CVSS priority over EUVD and the aggregator. A lower
-priority feed cannot silently overwrite the selected NVD score. Original
-per-source CVSS values are retained for comparison. Real-world CVSS
-selection still needs validation against vendor advisories where relevant.
+## 4. How are NVD, EUVD, FIRST and CISA synchronized?
 
-NVD 2.0 without an API key is throttled automatically; optional NVD_API_KEY
-in .env permits higher-rate use. EUVD public availability and schema can
-change; source errors are isolated and reported without stopping other feeds.
+| Source | Initial window / input | Update behavior | Important limitation |
+|---|---|---|---|
+| **cve.now** | Bounded latest advisory pages | Polls every 30 minutes by default | Not a complete historical CVE archive |
+| **NVD 2.0** | Recent **48-hour modified** CVE window | Two-hour cadence, checkpoint, short overlap, paginated | Does not automatically backfill all older CVEs |
+| **EUVD** | Recent **7-day publication** window | Four-hour cadence, paging, stored progress and overlap | Historical records modified outside the current window may be missed |
+| **FIRST EPSS** | Official full daily gzip CSV | Daily validation and local updates of already-known CVEs | No new asset Finding solely from a CSV score |
+| **CISA KEV** | Official complete JSON catalogue | Daily lookup and verification | Only enriches known CVE correlations |
+| **OSV** | Approved unique package/version tuples | Twenty-minute worker cadence; 24-hour per-tuple TTL | Does not cover every commercial product |
 
-## FIRST EPSS and CISA KEV
+These are **default polling intervals**, not claims about provider publication latency. Network/API schemas can change. NVD optionally accepts **NVD_API_KEY** in the local .env to support higher permitted rates; all public sources work without mandatory signup.
 
-FIRST recommends the full daily EPSS gzip CSV for enterprise syncing, not
-bulk use of its lookup endpoint. The Worker streams the HTTPS download with
-decompression/row caps, validates the data, and updates **only known local
-CVEs** with score, percentile and sync date. The entire public population
-is not stored. Malformed/truncated files do not replace existing values.
+**Why FIRST CSV instead of thousands of API calls?** FIRST recommends its daily bulk data file for large local synchronization. AVM streams and validates the compressed CSV, updating only CVEs already stored locally. It does not import every EPSS entry as a new host Finding.
 
-CISA's complete KEV catalog is retrieved daily as before. Only CISA-listed
-real CVEs receive a verified CISA KEV flag; an unrelated feed's own
-exploitation or EPSS indicator is not treated as official CISA/FIRST data.
-Neither feed is evidence of an installed vulnerable version.
+## 5. What exactly gets stored?
 
-## Metabase reporting and operator ergonomics
+The **application database** stores distinct records for:
 
-There are now **nine read-only dashboards**. Dashboard
-**09 · Source Intelligence & Coverage** adds:
-- source-level advisory counts, withdrawals and CVSS coverage;
-- freshness/failed syncs per provider;
-- OSV unique package-version cache coverage;
-- Finding-level source attribution from the **actual matched evidence**, not
-  a general advisory list;
-- per-source CVE aliases, scores, original publishers and timestamps;
-- structured package evidence and retraction status.
+- Assets, software products and individual installations.
+- Canonical vulnerability identifiers (prefer one explicit CVE alias).
+- **Advisory observations per provider**: source name, original ID, known aliases, source CVSS, fetched/updated timestamps, withdrawal status.
+- **Affected package evidence**: precise ecosystem/package, structured range or exact matched version, evidence status and source.
+- **OSV query cache**: checked unique package/version, result IDs and time.
+- **NVD/EUVD checkpoints**: completed/pending windows and page positions.
+- Findings: installation, canonical vulnerability ID, risk score, evidence packet, remediation candidates and lifecycle events.
 
-The existing dashboard 08 prioritization still uses the same CVSS/EPSS/KEV
-model, with source-provenance fields. Use the existing privileged CLI for risk
-acceptance. No additional web admin UI or dashboard credentials are created.
+The existing database constraint **(installation_id, vulnerability_id)** prevents duplicate Findings for **the same canonical ID**. **If two advisories lack a shared, unambiguous CVE alias**, their identities may remain separate; AVM deliberately does not guess equivalence from titles.
 
-## Minimal configuration (all optional)
+### CVSS selection and source independence
 
-The installer writes config/application.yaml from the example. Public
-integration switches under vulnerability_sources default to enabled in Live.
-To disable a source in a restricted network, set its enabled value to false.
-NVD_API_KEY is optional in private .env.
+When competing source CVSS values exist, the current selection preference is:
 
-Source schedules default to: cve.now 30 minutes, OSV 20 minutes (24-hour
-cache), NVD 2 hours (10-minute backlog continuation), EUVD 4 hours
-(10-minute backlog continuation), FIRST EPSS 24 hours, CISA KEV 24 hours.
-These are operational budgets, **not guaranteed source publication timings**.
+**NVD → EUVD → cve.now → OSV**
 
-Demo never connects to public vulnerability providers or a real Endpoint
-Central instance; its CVE-DEMO-* values and exposure are synthetic.
+That is a **field-specific metadata preference**, not a statement that NVD always wins package/version matching. Different CVSS vector versions and authoritative vendor ratings may require manual review. Per-source values remain visible.
 
-## Safety boundaries and production prerequisites
+**FIRST EPSS** and **CISA KEV** are sourced directly from their respective official feeds. AVM does not trust another advisory provider's unverified KEV/EPSS hint as an official statement.
 
-- This feature sends verified package names and versions to OSV. Even without
-  host identifiers, software inventory can be confidential: approve outbound
-  data sharing with security/network owners before enabling Live.
-- A positive package/version match is still **potential exposure**. Confirm
-  distro backports, build flags, vendor patches and business exposure manually.
-- Source overlap does not increase statistical confidence automatically.
-- SQLAlchemy migrations are additive. Existing database rows and dashboards
-  are retained. Back up/restore in staging before promoting V3.
-- NVD/CPE full applicability and EUVD free-text ranges do not automatically
-  create Findings: correct matching is more important than false coverage.
-- Large-inventory performance, OSV/NVD/EUVD public network compatibility
-  and real Endpoint Central API behavior need live staging measurements.
-- Failures are observable in reporting.source_sync_health and Worker logs.
-- The synthetic Docker Demo smoke and PostgreSQL unit/integration tests
-  verify code paths, not all production provider schemas or changing feeds.
+## 6. In Metabase, can I see who reported an issue?
 
-Relevant source documentation:
-- OSV API: https://google.github.io/osv.dev/post-v1-querybatch/
-- NVD CVE API: https://nvd.nist.gov/developers/vulnerabilities
-- EUVD API: https://euvd.enisa.europa.eu/apidoc
-- FIRST data: https://www.first.org/epss/data
-- CISA KEV: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+**Yes — open Dashboard 09 · Source Intelligence & Coverage.**
+
+| Card | How to use it |
+|---|---|
+| **Finding Source Attribution** | Which provider's **version-match evidence** was actually used for this host/installation |
+| **Per-Source Advisory and CVSS Provenance** | Original source IDs/aliases, individual CVSS and selected CVSS provider |
+| **Source Metadata Coverage** | Number of retrieved records from each provider |
+| **Source Range Disagreements** | Explicit comparable positive/negative version-range disagreement |
+| **Retracted OSV Evidence** | Former positive match for a queried tuple that is no longer reported |
+| **Feed Health** | Latest successful or failed collection by source |
+| **Incremental Feed Cursor and Backlog** | NVD/EUVD pending/finished update windows |
+| **OSV Cache Coverage** | How many unique package/version tuples have been checked |
+
+**Example, completely fictional:**
+
+| Question | Example answer |
+|---|---|
+| Which host? | sample-app-01 |
+| Which installed version? | example-package 1.2.0 |
+| Canonical CVE | CVE-2026-12345 |
+| Version matched by | OSV, cve.now |
+| Selected CVSS by | NVD |
+| EPSS by | FIRST |
+| Known exploited by | CISA KEV |
+| Source conflict | none observed |
+
+NVD providing the selected CVSS does **not** mean NVD itself produced the installed-version match. The two kinds of provenance are reported separately.
+
+## 7. What happens when providers disagree or go offline?
+
+A successful inventory scan is not the same as a successful public feed update. Each provider is logged separately. The Worker should preserve earlier source data when another provider fails.
+
+**Lifecycle safeguard:** when a previously matched OSV result disappears but the installation is still active, AVM keeps the Finding for review instead of treating the host as patched. A Finding is only marked **not_observed** when its installation is absent after a complete successful inventory; even that does not certify remediation.
+
+**Current limits of conflict checking:** AVM flags explicit version-range disagreements it can compare using its supported parser. It does **not** claim to solve all vendor-specific version semantics, all cross-ecosystem aliases or every CPE AND/OR configuration.
+
+## 8. Do I have to configure each source?
+
+**No.** A standard Live installation enables OSV, NVD, EUVD, cve.now, CISA KEV and FIRST EPSS with their default schedules. All run in the **existing Worker**; no new service is installed.
+
+You can adjust the optional **vulnerability_sources**, **cve** and **threat_intelligence** sections in **config/application.yaml**. If your network does not allow a provider, disable **that one** and observe the coverage gap in dashboards 06/09.
+
+Follow [Configuration](CONFIGURATION.md) for exact YAML examples and restart instructions.
+
+## 9. What this implementation does not promise
+
+- Complete vulnerability coverage for every software product or every historical CVE.
+- Evidence-independent majority voting across sources.
+- Correct matching of arbitrary vendor CPE configurations or distro backports.
+- A single merged identity for ambiguous aliases or all GHSA/EUVD entries.
+- Production performance proven on hundreds of thousands of Endpoint Central devices.
+- No need for a human to approve genuine package identity and validate patch applicability.
+
+The goal is **conservative, explainable evidence with a low-friction deployment**, not an unverified declaration that every detected product is vulnerable.
+
+**Official documentation:**
+- [OSV API reference](https://google.github.io/osv.dev/post-v1-querybatch/)
+- [NVD CVE API 2.0](https://nvd.nist.gov/developers/vulnerabilities)
+- [ENISA EUVD](https://euvd.enisa.europa.eu/)
+- [FIRST EPSS data](https://www.first.org/epss/data)
+- [CISA KEV catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog)
