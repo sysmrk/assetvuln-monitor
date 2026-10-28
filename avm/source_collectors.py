@@ -341,7 +341,9 @@ def sync_euvd(session, config=None, *, provider=None, clock=None):
             count += 1
         state['offset'] += 1
         if state['offset'] * size >= total:
-            cp.state = {'last_complete': (clock or now()).isoformat()}
+            # Store the processed window boundary, not the wall clock after
+            # a slow backlog. This prevents gaps if paging spans many cycles.
+            cp.state = {'last_complete': state['end'] + 'T00:00:00+00:00'}
             cp.updated_at = now()
             break
         cp.state = dict(state)
