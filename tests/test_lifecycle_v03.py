@@ -60,7 +60,12 @@ def test_feed_only_refresh_cannot_mark_findings_resolved():
         recalculate_findings(db, allow_disappearance=True)
         db.commit()
         installed = db.get(Installation, install.id)
-        installed.version = '2.0.0'
+        # Production installations are keyed by version, so a patched
+        # version is a new row and the old installation becomes inactive.
+        installed.active = False
+        patched = Installation(asset_id=asset.id, software_id=installed.software_id,
+                               version='2.0.0', active=True)
+        db.add(patched)
         db.flush()
         # Threat-intel/CVE-only recomputation must not claim remediation.
         assert recalculate_findings(db, allow_disappearance=False) == 0
@@ -77,7 +82,8 @@ def test_feed_only_refresh_cannot_mark_findings_resolved():
         assert 'not proof' in db.scalars(
             select(FindingEvent.reason).where(FindingEvent.action == 'not_observed')).one()
         # When the software becomes affected again, Reopened is audited.
-        installed.version = '1.2.0'
+        installed.active = True
+        patched.active = False
         db.flush()
         assert recalculate_findings(db, allow_disappearance=True) == 1
         db.commit()
