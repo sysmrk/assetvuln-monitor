@@ -40,6 +40,14 @@ Primary design rules:
 - [x] Automated CI tests for Python/SQLite, synthetic PostgreSQL, reporting permissions, config syntax, V1/V2 separation, and a full disposable synthetic Docker/Metabase Demo startup (successful workflow run 40599590218).
 - [x] Rewrite README, installation, configuration, security and troubleshooting for V3 simplicity and current limitations.
 
+### V3.3 — Multi-source advisory intelligence
+- [x] OSV unique approved package/version querybatch with full pagination and SQL-backed expiry cache.
+- [x] NVD CVE 2.0 modified-date metadata delta and EUVD recent published-record metadata cursor.
+- [x] FIRST full daily CSV instead of bulk lookup API; preserve CISA verified KEV flags.
+- [x] Per-provider source identities, aliases, selected CVSS origin, withdrawals and per-Finding matched source evidence.
+- [x] Ninth Metabase dashboard with source coverage, evidence, cache and sync freshness.
+- [x] Fail-closed source isolation and retention of historical retracted evidence.
+
 ## Remaining validation and future features
 
 **Not production validated:** running the actual Docker/Metabase UI on customer hardware, Endpoint Central API compatibility/pagination, KEV/EPSS provider responses from the target network, and vendor backport/patch confirmation. CI tests are not a substitute for these checks.
@@ -56,7 +64,7 @@ Primary design rules:
 ## Quality gates before promotion
 
 1. GitHub Actions must pass all unit, syntax, temporary PostgreSQL and read-only Compose separation checks for the final commit.
-2. [Partially verified] Fresh one-command Docker Demo and Metabase HTTPS/risk SQL/CLI have passed in CI; visually inspect all eight Metabase dashboards and queries in staging.
+2. [Partially verified] Fresh one-command Docker Demo and Metabase HTTPS/risk SQL/CLI have passed in CI; visually inspect all nine Metabase dashboards and queries in staging.
 3. Test Live integration using an approved read-only Endpoint Central token and a secure staging setup; verify actual pagination.
 4. Validate official KEV/EPSS feed refresh, failure rollback and freshness timestamps in that environment.
 5. Verify reviewer/actor access control and add production-quality audit protections.
