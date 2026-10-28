@@ -121,6 +121,10 @@ jobs:
           curl --fail --silent --show-error --insecure --max-time 20 https://127.0.0.1:8445/api/health
           docker compose exec -T postgres psql -U postgres -d avm -tAc "SELECT count(*) FROM reporting.risk_overview;"
           docker compose exec -T postgres psql -U postgres -d avm -tAc "SELECT count(*) FROM reporting.finding_evidence;"
+          docker compose exec -T postgres psql -U postgres -d avm -tAc "SELECT count(*) FROM reporting.source_advisories;"
+          docker compose exec -T postgres psql -U postgres -d avm -tAc "SELECT count(*) FROM reporting.finding_source_details;"
+          docker compose exec -T postgres psql -U postgres -d avm -tAc "SELECT count(*) FROM reporting.source_cursor_status;"
+          docker compose exec -T postgres psql -U postgres -d avm -tAc "SELECT count(*) FROM reporting.source_retractions;"
           docker compose exec -T worker python -m avm.ops queue --limit 3
           docker compose exec -T worker python -m avm.ops simulate --top 3
       - name: Print bounded application logs on failure
