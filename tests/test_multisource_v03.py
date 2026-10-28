@@ -126,3 +126,24 @@ def test_authoritative_cvss_source_is_not_overwritten_by_cve_now():
             select(AdvisoryObservation)).all()} == {
             ('nvd','CVE-2026-32100'), ('cve_now','CVE-2026-32100')}
     engine.dispose()
+
+
+
+def test_many_assets_still_generate_only_one_osv_tuple():
+    engine = create_engine('sqlite+pysqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        product = Software(name='Example App', vendor='Example',
+                           ecosystem='pypi', package_name='example-package')
+        db.add(product)
+        assets = [Asset(source_id=f'S{idx}', hostname=f'host-{idx}', active=True)
+                  for idx in range(500)]
+        db.add_all(assets)
+        db.flush()
+        db.add_all([
+            Installation(asset_id=a.id, software_id=product.id,
+                         version='1.2.3', active=True) for a in assets
+        ])
+        db.flush()
+        assert len(approved_unique_packages(db)) == 1
+    engine.dispose()
