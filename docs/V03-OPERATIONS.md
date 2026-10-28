@@ -1,132 +1,201 @@
-# V3 operations — priorities, evidence, lifecycle and remediation
+# Risk, evidence and lifecycle — everyday operation
 
-These commands run inside the existing v0.3 Worker container. There is **no second API, scheduler, database or new login screen**. All access to managed Endpoint Central devices remains GET-only.
+This is the practical guide for analysts who want to **prioritize, investigate and document** vulnerability findings without learning database administration.
 
-## What happens automatically
+**Start here:** [install the product](INSTALLATION.md), [learn the dashboards](USER-GUIDE.md), and [learn exact commands](COMMANDS.md).
 
-1. The existing Worker periodically downloads asset/software inventory (ManageEngine) and structured advisories (cve.now).
-2. Software identity suggestions are held for human review. Only verified YAML or explicitly approved DB mappings can create potential findings.
-3. Each potential finding gets a JSON evidence snapshot, priority components, an SLA target and a conservative remediation suggestion.
-4. Every ~24 hours **in Live only**, the same Worker downloads CISA KEV over HTTPS GET and the FIRST complete daily compressed EPSS CSV for local CVE enrichment. No API keys are required. OSV/NVD/EUVD enrichment uses the existing Worker with independent schedules. On failures, previous intelligence is kept and the Worker retries later.
-5. Successful inventory observations update the lifecycle. A missing match becomes **not_observed**, never automatically **resolved** or **patched**; incomplete/failed inventory does not close prior findings.
-6. The eighth Metabase dashboard tracks priorities, KEV, overdue findings, ownership, evidence, lifecycle/audit, context completeness and one daily modeled-score snapshot.
+## What happens automatically?
 
-**Scope:** the provider inventory APIs and cve.now integration still require verification against a real deployment. CVE polling is bounded to recent pages. Realtime EPSS or comprehensive historic CVE coverage is not claimed.
-
-## One-command synthetic Demo
-
-~~~bash
-./install.sh --demo
+~~~mermaid
+flowchart TD
+    I["Endpoint Central inventory sync"] --> M["Approved software identity"]
+    S["cve.now + OSV exact version evidence"] --> C["Correlation"]
+    M --> C
+    C --> F["Potential Finding"]
+    N["NVD + EUVD CVSS / advisory details"] --> R["Risk model"]
+    K["FIRST EPSS + CISA KEV"] --> R
+    F --> R
+    R --> Q["P1–P4 queue + evidence + SLA"]
+    Q --> A["Analyst validation, remediation or exception"]
 ~~~
 
-This automatically generates local credentials, creates safe default files, configures isolated Compose resources and provisions the dashboards. Find the admin account in the private .env:
+The Worker, **without extra containers or jobs**, refreshes source data and updates local PostgreSQL. Dashboard data is **read-only from Metabase**. It **never** patches endpoint software, remotely executes code or tests exploits.
+
+## 1. Show the top potential Findings
+
+Open a Linux terminal in the correct **V3 checkout**:
 
 ~~~bash
-grep '^METABASE_ADMIN_EMAIL=' .env
-grep '^METABASE_ADMIN_PASSWORD=' .env
+docker compose exec -T worker python -m avm.ops queue --limit 20
 ~~~
 
-Open https://localhost:8445. Demo findings are synthetic and never emailed.
-
-## Read the prioritized queue
-
-~~~bash
-docker compose exec worker python -m avm.ops queue --limit 20
-~~~
-
-Example entry (illustrative, **not** a finding from your infrastructure):
+**This command is read-only.** Each JSON line contains approximately:
 
 ~~~json
 {
   "finding_id": 12,
-  "asset": "SAMPLE-SERVER",
+  "asset": "EXAMPLE-HOST",
   "cve": "CVE-2026-12345",
   "risk_score": 81.5,
   "priority": "P1",
+  "reporting_sources": ["osv", "cve_now"],
   "state": "open",
   "accepted_until": null
 }
 ~~~
 
-P1 means composite score at least 75; P2 ≥50, P3 ≥25, and P4 otherwise. The score combines up to 40 CVSS points, up to 20 EPSS points, 25 KEV points, up to 10 explicitly configured asset-criticality points and 5 explicitly verified Internet-exposure points. KEV sets a minimum of 75 points. Missing signals appear in the evidence factors and **are not inferred from other signals**.
+**The example values are fictional.** Use the actual printed Finding IDs for subsequent actions.
 
-This is a relative workload-prioritization model, *not* a calibrated likelihood of compromise. Verify product identity, actual patch levels and host exposure before declaring an issue confirmed.
+### What does P1 mean?
 
-## Optional: annotate critical assets
+AVM uses an internal **0–100 prioritization score**:
 
-The installer creates config/asset-context.yaml from a safe template; this file is git-ignored. Add only verified information:
+| Signal | Maximum |
+|---|---:|
+| CVSS base score | 40 |
+| FIRST EPSS probability, transformed for prioritization | 20 |
+| Official CISA KEV membership | 25 |
+| Verified asset criticality | 10 |
+| Verified Internet-facing status | 5 |
+
+- **P1** = 75 or higher; default SLA **7 days**.
+- **P2** = 50–74.99; default SLA **30 days**.
+- **P3** = 25–49.99; default SLA **90 days**.
+- **P4** = below 25; default SLA **180 days**.
+
+Verified KEV membership sets a minimum of **75 modeled points** on a potential match. Missing signals are marked **unknown** rather than guessed. SLA targets are calculated from the first observed potential Finding; your organization should adjust them before relying on them as operational deadlines.
+
+**An AVM score of 80 is NOT an 80% chance of compromise.** FIRST EPSS is a separate estimated probability of exploitation over a 30-day horizon.
+
+## 2. Investigate why AVM produced a Finding
+
+Open **08 · Risk Intelligence & Remediation** in Metabase, and use **09 · Source Intelligence & Coverage** for source attribution.
+
+Check:
+1. **Host:** correct asset, operating system, owner and business service.
+2. **Installed version:** exactly what the inventory returned.
+3. **Approved mapping:** the package identity matches the actual installed product/edition.
+4. **Version evidence:** a supported affected-version range, or an exact OSV package/version query result.
+5. **Source:** cve.now or OSV provided the matching evidence; NVD/EUVD may add metadata and selected CVSS.
+6. **Vendor remediation:** fixed version, backports, edition exceptions, build flags and compensating controls.
+
+**A generated fixed-version candidate is a clue, not an instruction to patch blindly.** Compare with the vendor's own supported releases and OS distribution security bulletins.
+
+## 3. Add business importance (optional)
+
+The installer creates a private file **config/asset-context.yaml**. It may remain empty.
+
+~~~bash
+nano config/asset-context.yaml
+~~~
+
+Example with **illustrative** values:
 
 ~~~yaml
 assets:
-  - source_id: "301"
+  - source_id: "12345"
     criticality: critical
     internet_facing: true
     business_service: "Payment API"
     owner: "Platform Team"
 ~~~
 
-Use the precise source ID returned by Endpoint Central. Criticality can be unknown, low, medium, high or critical. Internet-facing can be true, false or null (unknown). **Do not infer exposure from an RFC1918 address or name alone.** On the next successful inventory sync, the Worker applies the context automatically. No credentials or source-code changes are needed.
+Use the **verified Endpoint Central source ID**, not a guessed ID from a hostname. The Worker reads the file on the **next inventory sync**. A missing value remains **unknown**.
 
-## Remediation and evidence
+Do not set **internet_facing: true** solely because a server has an IP address.
 
-The Metabase **08 · Risk Intelligence & Remediation** dashboard provides:
-- **Risk-Based Remediation Queue:** ranked potential findings, ownership, CVSS/EPSS/KEV, SLA due date and status.
-- **Finding Evidence & Candidate Remediation:** exact installed version, approved package identity, structured version ranges and candidate fixed-version events.
-- **CISA KEV Exposure Queue:** findings with a CISA KEV catalogue entry, not proof of exploitability on the local asset.
-- **Risk Acceptance & Lifecycle** and **Finding Decision & State Audit:** read-only history.
+## 4. Understand lifecycle states correctly
 
-Candidate fixed versions are derived only from machine-readable fixed events. A vendor backport or product edition may invalidate a simplistic package upgrade recommendation. The system **never deploys updates or remotely changes endpoints**.
+~~~mermaid
+stateDiagram-v2
+    [*] --> open: Potential match detected
+    open --> accepted: Risk accepted by privileged operator
+    accepted --> open: Acceptance expires or released
+    open --> needs_review: Evidence withdrawn or unmatchable<br/>but installation still observed
+    needs_review --> open: Supported match observed again
+    open --> not_observed: Installation absent after complete inventory
+    not_observed --> open: Previously absent match returns
+~~~
 
-## Temporarily accept a known risk
+| State/event | What it tells you | What it does not prove |
+|---|---|---|
+| **detected / open** | Current potential host–version correlation | That the machine is exploitable |
+| **accepted** | An administrator recorded a time-bounded exception | That the issue disappeared |
+| **needs_review** | Installed software remains but support for an earlier match changed | That the source or version is definitely wrong |
+| **not_observed** | Relevant installation absent after completed inventory | That a secure patch was deployed |
+| **reopened** | Previously not-observed potential match returned | That a new exploit occurred |
+| **acceptance_expired** | The modeled exception date elapsed | That the organization remediated anything |
 
-This is an **explicit privileged database write** and requires container/database access. Actor strings are self-reported; **SSO/RBAC and approval delegation are NOT implemented**. Implement organizational change control outside this tool and restrict Docker access.
+**Partial/failed inventory or a public-source timeout cannot automatically close Findings.** Unexpectedly empty inventory is rejected where active assets were previously present. A changed source may flag a review rather than declare remediation.
+
+A successful application-level audit is not immutable WORM storage.
+
+## 5. Temporarily accept a risk (explicit DB write)
+
+**Only authorized staff should run these commands.** The CLI asks for an actor name and reason, but **does not verify the human identity with SSO/RBAC**. Obtain approval using your organization's existing change or risk-acceptance process.
+
+First identify the actual Finding ID with the read-only queue command in section 1.
+
+Example: accept **Finding 12** for the next **30 days** (replace **12** and actor/reason with your approved real values):
 
 ~~~bash
-docker compose exec worker python -m avm.ops accept \
+docker compose exec -T worker python -m avm.ops accept \
   --finding-id 12 \
-  --actor "risk_owner" \
-  --until 2026-12-01 \
-  --reason "Time-bound exception approved in change record; mitigation applied."
+  --actor "risk-owner" \
+  --until "$(date -u -d '+30 days' +%F)" \
+  --reason "Approved change ticket: temporary exception with compensating controls"
 ~~~
 
-The expiry must be 1–180 days from today. The original finding remains visible and active; acceptance does not prove remediation. The next matching cycle expires outdated acceptance. To withdraw one:
+The command writes to AVM's **findings** and **finding_events** tables only. It does **not** change endpoints or hide the Finding. The expiry must be **1–180 days** in the future and the reason must provide sufficient detail.
+
+**Release an acceptance early:**
 
 ~~~bash
-docker compose exec worker python -m avm.ops release \
+docker compose exec -T worker python -m avm.ops release \
   --finding-id 12 \
-  --actor "risk_owner" \
-  --reason "Risk acceptance withdrawn after review of new evidence."
+  --actor "risk-owner" \
+  --reason "Approved exception withdrawn following updated vendor assessment"
 ~~~
 
-All changes append an event to the finding_events table; this audit is **application-level, not cryptographically immutable**.
+The release is also a **local application database write**.
 
-## Read-only remediation simulation
+## 6. Simulate remediation impact safely
+
+These two commands are **read-only**:
 
 ~~~bash
-docker compose exec worker python -m avm.ops simulate --top 20
-docker compose exec worker python -m avm.ops simulate --kev
+docker compose exec -T worker python -m avm.ops simulate --top 20
+docker compose exec -T worker python -m avm.ops simulate --kev
 ~~~
 
-Simulation mathematically removes ranking points for a selected group of current findings and reports the percentage reduction in the **model's summed points**. It neither marks findings resolved nor patches software. The model assumes independent findings and is not a reliable measure of true organizational risk reduction. Do not use the percentage as a forecast of prevented attacks.
+They calculate how many **modeled score points** would be removed if the selected Findings disappeared. They do not change the current Finding state, install a patch or estimate how many real incidents would be prevented.
 
-## Finding lifecycle and data quality
+This is an **operational prioritization exercise**, not a validated model of real-world risk reduction.
 
-- New affected product/version association: **detected** → **open**.
-- Match not found after a completed inventory: **not_observed**. This means only that the potential match was absent from the scan, not that the software was patched.
-- Previously unseen match returns: **reopened** → **open**.
-- Accepted risk reaches expiration: **acceptance_expired** → **open**.
-- Reviewer can change acceptance using explicit CLI commands; dashboards cannot edit state.
+## 7. What should I do each day?
 
-A source error cannot trigger closure based on missing data. An unexpectedly empty inventory when the database contains active assets is rejected rather than deactivating the fleet.
+A practical first routine:
 
-## Backups, separation and limitations
+1. Open **06 · Pipeline Health & Coverage**. If inventory or public feeds failed, treat coverage as potentially stale.
+2. Open **07 · Mapping Quality & Review**. Work through important, **verifiable** identity proposals.
+3. Open **08 · Risk Intelligence & Remediation**. Review P1/KEV and overdue potential findings first.
+4. Open **09 · Source Intelligence & Coverage**. Check the *actual source match* on important issues, explicit version-range conflicts and withdrawn evidence.
+5. Validate the affectedness with the vendor, agree on a patch or exception, and record decisions using your organization's process.
+
+For audits and governance, preserve source timestamps, approved mapping decisions and business context. Never call a discrepancy a confirmed exploit or a completed patch without independent supporting evidence.
+
+## 8. Backup and recovery
 
 ~~~bash
 ./scripts/backup.sh
 docker compose ps
-docker compose logs --tail=200 worker
+docker compose logs --tail=120 worker
 ~~~
 
-Keep V1, V2 and V3 in **separate checkouts and Compose projects**; V3 defaults to assetvuln-monitor-v03, HTTPS 8445. Demo and Live cannot share the same installation/database. Never use docker compose down -v unless you intend to destroy that project's data and have verified backups.
+Back up **both** PostgreSQL databases and separately preserve private runtime configuration, tokens and certificates. Never run **docker compose down -v** as a troubleshooting step.
 
-The V3 migrations are **additive**, non-destructive column additions, but PostgreSQL 17 upgrade/load behavior, API compatibility and Metabase provisioning against a real corporate setup remain staging validation requirements. A disposable one-command Docker/Metabase synthetic Demo passed in GitHub Actions run 40599590218; it does not establish real Live integration compatibility. See [security](SECURITY.md) and [troubleshooting](TROUBLESHOOTING.md).
+For restore commands and their destructive consequences, use [Operator command book](COMMANDS.md#8-back-up-stop-and-restart).
+
+### What has and has not been validated?
+
+The **synthetic Docker Demo and ephemeral PostgreSQL integration tests** run in GitHub Actions. Live Endpoint Central response schemas, each changing external feed, giant inventories, browser-facing production TLS and recovery on an existing production deployment must still be validated in staging. This application is a V3 technical preview, **not a production certification**.
