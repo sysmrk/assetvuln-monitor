@@ -8,13 +8,13 @@ A self-hosted, **read-only toward managed endpoints** asset/vulnerability monito
 
 Endpoint Central (GET only) + cve.now (GET only) + public CISA KEV / FIRST EPSS (GET only, Live only) → existing Python Worker → PostgreSQL → Metabase behind NGINX HTTPS.
 
-- **8 Metabase dashboards:** the original seven plus **08 · Risk Intelligence & Remediation**.
+- **9 Metabase dashboards:** the original seven plus **08 · Risk Intelligence & Remediation** and **09 · Source Intelligence & Coverage**.
 - **Finding evidence:** version, approved package, machine-readable affected ranges, candidate fixed versions and validation caveats.
 - **Risk priority P1–P4:** explainable ranking based on available CVSS, EPSS, CISA KEV and *explicit* asset context. Missing information is labelled unknown, not fabricated.
 - **Lifecycle:** detected, reopened and not-observed events. Missing inventory is never proof of remediation. Time-limited risk acceptance is auditable.
 - **Remediation:** candidates only where source advisories declare an explicit fixed version; no auto patching or remote execution.
 - **Read-only simulation:** hypothetical reduction of model score points for top-ranked or KEV findings. This is **not** a prediction of actual risk reduction.
-- **Daily public threat enrichment:** bounded requests to CISA KEV and FIRST EPSS; no API key or second Worker required. On failure, last good values remain.
+- **Daily public threat enrichment:** bounded CISA KEV requests and full FIRST EPSS daily CSV; no API key or second Worker required. On failure, last good values remain.
 - **Mapping governance from V2:** human approval still required for candidate software identity matches; a fuzzy match never creates a Finding.
 
 ## Quick start: Demo in one command
@@ -79,7 +79,7 @@ docker compose exec worker python -m avm.review_cli list --status pending
 
 Setting asset criticality and internet exposure is **optional**: edit the auto-generated, git-ignored config/asset-context.yaml with verified source IDs. Unknown context is not guessed. To record a temporary, time-limited risk acceptance, follow [operator guide](docs/V03-OPERATIONS.md).
 
-## Eight dashboards
+## Nine dashboards
 
 | Dashboard | Purpose |
 |---|---|
@@ -91,6 +91,7 @@ Setting asset criticality and internet exposure is **optional**: edit the auto-g
 | 06 · Pipeline Health & Coverage | Data source collection and mapping coverage |
 | 07 · Mapping Quality & Review | Review queue, identity coverage, audit, data gaps |
 | **08 · Risk Intelligence & Remediation** | Priorities, SLA, KEV, vendor evidence, ownership and daily trends |
+| **09 · Source Intelligence & Coverage** | Source provenance, original IDs, aliases, sync health, source evidence and OSV cache |
 
 All dashboard questions select from approved reporting views; Metabase does not get SQL write permissions to the application schema.
 
@@ -109,6 +110,7 @@ The score is **an operational priority metric**, not an exploit probability. An 
 ## Documentation
 
 - [Installation / Demo / Live](docs/INSTALLATION.md)
+- [Multi-source advisory integration (OSV, NVD, EUVD, FIRST)](docs/V03-MULTISOURCE.md)
 - [V3 operations: priorities, simulation, acceptance](docs/V03-OPERATIONS.md)
 - [Configuration fields and context](docs/CONFIGURATION.md)
 - [Security model and remaining risks](docs/SECURITY.md)
