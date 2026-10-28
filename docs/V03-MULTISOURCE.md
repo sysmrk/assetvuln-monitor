@@ -77,9 +77,12 @@ foreign keys or assume two similar GHSA/EUVD records are the same issue.
 7. Failed/partial source requests never overwrite the last successful
    source evidence or close findings.
 
-Source disagreement is not currently treated as an automatic tie-break or
-majority vote. A displayed source retraction flags a review requirement, not
-proof another feed is wrong.
+When two machine-comparable affected ranges for the same approved package
+and installed version disagree explicitly, the Finding stays active and
+source_conflict is set to potential_range_disagreement. Silence and absence
+from a feed are never counted as disagreement. The ninth Metabase dashboard
+has review queues for explicit range disagreements and source retractions;
+neither can be resolved automatically by majority vote.
 
 ## NVD and EUVD delta collection
 
