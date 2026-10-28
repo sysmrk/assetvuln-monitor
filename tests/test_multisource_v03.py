@@ -165,3 +165,28 @@ def test_demo_sources_are_synthetic_and_offline():
         assert db.get(Vulnerability, 'CVE-DEMO-0001').cvss_source == 'cve_now'
         assert float(db.get(Vulnerability, 'CVE-DEMO-0001').cvss) == 9.1
     engine.dispose()
+
+
+
+def test_explicit_negative_range_is_reviewed_not_used_to_veto_osv_positive():
+    engine = create_engine('sqlite+pysqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        _setup(db)
+        mark_query_evidence(db, ecosystem='pypi', package_name='example-package',
+                            version='1.0.0', source_records=[_osv_record()])
+        upsert_vulnerabilities(db, [{
+            'id':'CVE-2026-32100', 'title':'Conflicting source version range',
+            'affected':[{'package':{'ecosystem':'PyPI','name':'example-package'},
+                         'versions':['2.0.0']}]
+        }])
+        assert recalculate_findings(db, allow_disappearance=True) == 2
+        db.flush()
+        details = db.scalars(select(Finding)).all()
+        assert all(row.active for row in details)
+        assert all(row.evidence_packet['reporting_sources'] == ['osv'] for row in details)
+        assert all(row.evidence_packet['source_conflict'] == 'potential_range_disagreement'
+                   for row in details)
+        assert all(row.evidence_packet['range_disagreement_sources'] == ['cve_now']
+                   for row in details)
+    engine.dispose()
