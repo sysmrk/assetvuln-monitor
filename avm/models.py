@@ -568,9 +568,16 @@ VIEWS = {
         f.active, f.workflow_state, f.priority, f.risk_score,
         coalesce(f.evidence_packet->'reporting_sources','[]'::json) AS reporting_sources,
         coalesce(json_array_length(f.evidence_packet->'reporting_sources'),0) AS reporting_path_count,
+        coalesce(f.evidence_packet->>'source_conflict', 'unassessed') AS source_conflict,
         f.evidence_packet, f.last_detected
  FROM findings f JOIN installations i ON i.id=f.installation_id
  JOIN assets a ON a.id=i.asset_id JOIN software s ON s.id=i.software_id
+''',
+'source_conflicts': '''
+ SELECT finding_id, canonical_id, hostname, software, version, priority,
+        risk_score, reporting_sources, source_conflict, evidence_packet
+ FROM reporting.finding_source_details
+ WHERE active AND source_conflict='potential_range_disagreement'
 ''',
 'source_retractions': '''
  SELECT p.vulnerability_id AS canonical_id, p.source, p.source_id,
