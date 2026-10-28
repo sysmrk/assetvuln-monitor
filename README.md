@@ -6,7 +6,7 @@ A self-hosted, **read-only toward managed endpoints** asset/vulnerability monito
 
 ## Architecture: same four containers, no new infrastructure
 
-Endpoint Central (GET only) + cve.now (GET only) + public CISA KEV / FIRST EPSS (GET only, Live only) → existing Python Worker → PostgreSQL → Metabase behind NGINX HTTPS.
+Endpoint Central (GET-only inventory) + cve.now + OSV QueryBatch (read-only POST) + NVD 2.0 + ENISA EUVD + CISA KEV + FIRST daily EPSS CSV → existing Worker → PostgreSQL → Metabase behind NGINX HTTPS. Public sources run in Live mode only.
 
 - **9 Metabase dashboards:** the original seven plus **08 · Risk Intelligence & Remediation** and **09 · Source Intelligence & Coverage**.
 - **Finding evidence:** version, approved package, machine-readable affected ranges, candidate fixed versions and validation caveats.
