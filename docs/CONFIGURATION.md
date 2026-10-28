@@ -54,7 +54,7 @@ Do not commit actual .env, certificates, credentials, asset-context configuratio
 
 No additional API keys are required for CISA KEV, FIRST EPSS, OSV or EUVD. NVD_API_KEY is optional. The Worker uses fixed HTTPS origins:
 - CISA KEV: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
-- FIRST EPSS: https://api.first.org/data/v1/epss
+- FIRST EPSS daily bulk CSV: https://epss.empiricalsecurity.com/epss_scores-current.csv.gz (recommended for large-scale ingestion; the public /data/v1/epss API is for limited lookups)
 
 The FIRST **daily CSV** is streamed and validated for bulk updates of known local CVEs; its API is no longer used for mass lookup. Existing EPSS/KEV values are kept if refresh fails. The retrieval timestamp indicates when AVM checked the source, not a guarantee of publication freshness.
 
