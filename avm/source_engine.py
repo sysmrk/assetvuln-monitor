@@ -118,6 +118,12 @@ def mark_query_evidence(session, *, ecosystem, package_name, version, source_rec
         if not OSV_ID.fullmatch(osv_id):
             raise ValueError('Invalid OSV ID')
         if record.get('withdrawn'):
+            note_advisory(session, source='osv', source_id=osv_id,
+                          aliases=record.get('aliases') or [],
+                          title=record.get('summary'), withdrawn=True,
+                          updated_at=parse_time(record.get('modified')),
+                          raw={'withdrawn': record.get('withdrawn'),
+                               'modified': record.get('modified'), 'affected': []})
             continue
         # A match returned by querybatch is only accepted if the detailed
         # advisory independently refers to the same exact approved package.
